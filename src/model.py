@@ -89,3 +89,8 @@ class VGG16(nn.Module):
         for s in size:
             num_features *= s
         return num_features
+
+    def loss(self, output, target):
+        output = F.softmax(output, dim=1)
+        loss = nn.CrossEntropyLoss()(input=output, target=target)
+        return loss

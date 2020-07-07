@@ -3,7 +3,6 @@ from pathlib import Path
 from PIL import Image
 import xml.etree.ElementTree as ET
 import json
-import torch
 
 
 class PascalVOCDataset(Dataset):
@@ -28,7 +27,7 @@ class PascalVOCDataset(Dataset):
             image = Image.open(image_path).crop(coord).resize((self.imsize, self.imsize))
             if self.transform:
                 image = self.transform(image)
-            label = torch.eye(len(self.label_map))[self.label_map[class_name]]
+            label = self.label_map[class_name]
 
             return image, label
 
