@@ -3,3 +3,6 @@ data
 
 # practice
 ren*
+
+# cache
+__pycache__
