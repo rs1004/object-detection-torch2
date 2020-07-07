@@ -6,6 +6,7 @@ import torch.nn.functional as F
 class VGG16(nn.Module):
     def __init__(self, class_num, is_train=True):
         # initialize
+        super(VGG16, self).__init__()
         self.is_train = is_train
 
         # layer1
@@ -25,19 +26,19 @@ class VGG16(nn.Module):
         self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2)
 
         # layer4
-        self.conv4_1 = nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, padding=1)
+        self.conv4_1 = nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, padding=2)
         self.conv4_2 = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1)
         self.conv4_3 = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1)
         self.pool4 = nn.MaxPool2d(kernel_size=2, stride=2)
 
         # layer5
-        self.conv5_1 = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1)
+        self.conv5_1 = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=2)
         self.conv5_2 = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1)
         self.conv5_3 = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1)
         self.pool5 = nn.MaxPool2d(kernel_size=2, stride=2)
 
         # layer6
-        self.fc6_1 = nn.Linear(in_features=1024 * 10 * 10, out_features=4096)
+        self.fc6_1 = nn.Linear(in_features=512 * 10 * 10, out_features=4096)
         self.fc6_2 = nn.Linear(in_features=4096, out_features=4096)
         self.fc6_3 = nn.Linear(in_features=4096, out_features=class_num)
 
