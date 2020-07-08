@@ -33,7 +33,7 @@ if __name__ == '__main__':
         dataset=dataset,
         batch_size=args.batch_size,
         shuffle=True,
-        num_workers=1)
+        num_workers=10)
 
     net = VGG16(
         class_num=dataset.class_num
