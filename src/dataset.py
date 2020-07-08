@@ -16,6 +16,7 @@ class PascalVOCDataset(Dataset):
         else:
             raise ValueError(f'purpose "{self.purpose}" is isvalid')
         self.label_map = self._get_label_map()
+        self.class_num = len(self.label_map)
 
     def __len__(self):
         return len(self.data_list)
