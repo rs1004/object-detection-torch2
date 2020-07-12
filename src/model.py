@@ -68,3 +68,48 @@ class VGG16(nn.Module):
             elif isinstance(m, nn.Linear):
                 nn.init.normal_(m.weight, 0, 0.01)
                 nn.init.constant_(m.bias, 0)
+
+
+class SSD(nn.Module):
+    def __init__(self, num_classes, num_classes_vgg16, weights_path_ssd=None, weights_path_vgg16=None):
+        # initialize
+        super(SSD, self).__init__()
+        self.num_classes = num_classes
+
+        # extra feature layer
+        layers = []
+        in_channels = 512
+        cfg = [(3, 1024), (1, 1024), (1, 256), (3, 512), (1, 128), (3, 256), (1, 128), (3, 256), (1, 128), (3, 256)]
+        str_2_layers = {3, 5, 7, 9}
+        for i, (k, v) in enumerate(cfg):
+            s = 2 if i in str_2_layers else 1
+            p = 1 if k == 3 and i < len(cfg) - 1 else 0
+            layers += [
+                nn.Conv2d(in_channels=in_channels, out_channels=v, kernel_size=k, stride=s, padding=p),
+                nn.BatchNorm2d(v),
+                nn.ReLU(inplace=True)
+            ]
+            in_channels = v
+
+        vgg16 = VGG16(num_classes=num_classes_vgg16, weights_path=weights_path_vgg16)
+        self.features = nn.Sequential(vgg16.features[:-1], *layers)
+
+        self.classifier = {
+            32: nn.Conv2d(in_channels=512, out_channels=4*(num_classes+4), kernel_size=3, padding=1),
+            49: nn.Conv2d(in_channels=1024, out_channels=6*(num_classes+4), kernel_size=3, padding=1),
+            55: nn.Conv2d(in_channels=512, out_channels=6*(num_classes+4), kernel_size=3, padding=1),
+            61: nn.Conv2d(in_channels=256, out_channels=6*(num_classes+4), kernel_size=3, padding=1),
+            67: nn.Conv2d(in_channels=256, out_channels=4*(num_classes+4), kernel_size=3, padding=1),
+            73: nn.Conv2d(in_channels=256, out_channels=4*(num_classes+4), kernel_size=3, padding=1),
+        }
+
+    def forward(self, x):
+        batch_size = x.size(0)
+        y = torch.empty((batch_size, self.num_classes + 4, 0))
+
+        for i, layer in enumerate(self.features):
+            x = layer(x)
+            if i in self.classifier:
+                y = torch.cat([y, self.classifier[i](x).view(batch_size, self.num_classes + 4, -1)], dim=2)
+
+        return y
