@@ -4,21 +4,22 @@ import torch.nn.functional as F
 
 
 class VGG16(nn.Module):
-    def __init__(self, weights_path=None):
+    def __init__(self, num_classes, weights_path=None):
         # initialize
         super(VGG16, self).__init__()
 
         # feature extraction layer
         layers = []
         in_channels = 3
-        cfg = [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M']
-        pad_2s = (10, 14)
+        cfg = [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M_P', 512, 512, 512, 'M', 512, 512, 512, 'M_P']
         for i, v in enumerate(cfg):
             if v == 'M':
                 layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
+            elif v == 'M_P':
+                layers += [nn.MaxPool2d(kernel_size=2, stride=2, padding=1)]
             else:
                 layers += [
-                    nn.Conv2d(in_channels=in_channels, out_channels=v, kernel_size=3, padding=2 if i in pad_2s else 1),
+                    nn.Conv2d(in_channels=in_channels, out_channels=v, kernel_size=3, padding=1),
                     nn.BatchNorm2d(v),
                     nn.ReLU(inplace=True)
                 ]
@@ -34,7 +35,7 @@ class VGG16(nn.Module):
             nn.Linear(4096, 4096),
             nn.ReLU(inplace=True),
             nn.Dropout(),
-            nn.Linear(4096, 1000)
+            nn.Linear(4096, num_classes)
         )
 
         # load weights
