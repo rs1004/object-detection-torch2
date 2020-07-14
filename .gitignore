@@ -1,6 +1,7 @@
 # data
 data
 data.tar
+*.pth
 
 # practice
 ren*
