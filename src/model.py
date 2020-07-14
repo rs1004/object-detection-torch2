@@ -92,15 +92,17 @@ class SSD(nn.Module):
             in_channels = v
 
         vgg16 = VGG16(num_classes=num_classes_vgg16, weights_path=weights_path_vgg16)
-        self.features = nn.Sequential(vgg16.features[:-1], *layers)
+        vgg16_to_conv5_3 = [m for m in vgg16.features[:-1].modules() if not isinstance(m, nn.Sequential)]
+            
+        self.features = nn.Sequential(*(vgg16_to_conv5_3 + layers))
 
         self.classifier = {
             32: nn.Conv2d(in_channels=512, out_channels=4*(num_classes+4), kernel_size=3, padding=1),
-            49: nn.Conv2d(in_channels=1024, out_channels=6*(num_classes+4), kernel_size=3, padding=1),
-            55: nn.Conv2d(in_channels=512, out_channels=6*(num_classes+4), kernel_size=3, padding=1),
-            61: nn.Conv2d(in_channels=256, out_channels=6*(num_classes+4), kernel_size=3, padding=1),
-            67: nn.Conv2d(in_channels=256, out_channels=4*(num_classes+4), kernel_size=3, padding=1),
-            73: nn.Conv2d(in_channels=256, out_channels=4*(num_classes+4), kernel_size=3, padding=1),
+            48: nn.Conv2d(in_channels=1024, out_channels=6*(num_classes+4), kernel_size=3, padding=1),
+            54: nn.Conv2d(in_channels=512, out_channels=6*(num_classes+4), kernel_size=3, padding=1),
+            60: nn.Conv2d(in_channels=256, out_channels=6*(num_classes+4), kernel_size=3, padding=1),
+            66: nn.Conv2d(in_channels=256, out_channels=4*(num_classes+4), kernel_size=3, padding=1),
+            72: nn.Conv2d(in_channels=256, out_channels=4*(num_classes+4), kernel_size=3, padding=1),
         }
 
     def forward(self, x):
