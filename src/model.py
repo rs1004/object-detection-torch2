@@ -107,11 +107,11 @@ class SSD(nn.Module):
 
     def forward(self, x):
         batch_size = x.size(0)
-        y = torch.empty((batch_size, self.num_classes + 4, 0))
+        y = torch.empty((batch_size, 0, self.num_classes + 4))
 
         for i, layer in enumerate(self.features):
             x = layer(x)
             if i in self.classifier:
-                y = torch.cat([y, self.classifier[i](x).view(batch_size, self.num_classes + 4, -1)], dim=2)
+                y = torch.cat([y, self.classifier[i](x).view(batch_size, -1, self.num_classes + 4)], dim=1)
 
         return y
