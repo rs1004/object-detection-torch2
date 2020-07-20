@@ -45,7 +45,7 @@ class SSDLoss(nn.Module):
         # hard negative mining
         pos_num = (is_match.sum(dim=2) != 0).sum(dim=1)
         neg_num = P - pos_num
-        pos_num, neg_num = split_pos_neg(pos_num, neg_num)
+        pos_num, neg_num = self.split_pos_neg(pos_num, neg_num)
 
         valid_mask = torch.stack([torch.kthvalue(l_conf[i], k=neg_num[i]).values for i in range(N)]).unsqueeze(1) > l_conf
         valid_mask += -torch.stack([torch.kthvalue(-l_conf[i], k=pos_num[i]).values for i in range(N)]).unsqueeze(1) < l_conf
@@ -125,3 +125,16 @@ class SSDLoss(nn.Module):
 
         sm = torch.exp(pr) / torch.exp(pr).sum(dim=3, keepdims=True)
         return -(gt * torch.log(sm)).sum(dim=3)
+
+    def split_pos_neg(self, pos_num: torch.Tensor, neg_num: torch.Tensor) -> torch.Tensor:
+        """split pos:neg = 1:3
+
+        Args:
+            pos_num (torch.Tensor): (N)
+            neg_num (torch.Tensor): (N)
+
+        Returns:
+            torch.Tensor: (N)
+        """
+        cond = pos_num * 3 > neg_num
+        return torch.where(cond, neg_num // 3, pos_num), torch.where(cond, neg_num, pos_num * 3)
