@@ -7,74 +7,72 @@ class SSDLoss(nn.Module):
         # initialize
         super(SSDLoss, self).__init__()
 
-    def forward(self, outputs, default_bboxes, gt_bboxes, a=1):
-        '''
-        Args
-            outputs: torch.tensor (size: [batch_size, bbox_num, class_num + 4])
-            default_bboxes: torch.tensor (size: [bbox_num, 4])
-            gt_bboxes: list: ([{'c': class_id, 'bbox': torch.tensor([cx, cy, w, h])}, …])
-        '''
-        loss = 0.0
-        for pred_bboxes in outputs:
-            N = 0
-            l_loc = torch.empty(0)
-            l_conf_pos = torch.empty(0)
-            l_conf_neg = torch.empty(0)
-            for i in range(pred_bboxes.shape[0]):
-                is_negative = True
-                for j in range(len(gt_bboxes)):
-                    jaccard_overlap = calc_iou(default_bboxes[i], gt_bboxes[j]['bbox'])
-                    if jaccard_overlap > 0.5:
-                        l = pred_bboxes[i][:4]
-                        g = calc_delta(gt_bboxes[j]['bbox'], default_bboxes[i])
-                        l_loc = torch.cat([l_loc, smooth_l1(l - g)])
-                        l_conf_pos = torch.cat([l_conf_pos, -log_softmax(pred_bboxes[i][4:], gt_bboxes[j]['c'])])
-                        N += 1
-                        is_negative = False
-                if is_negative:
-                    l_conf_neg = torch.cat([l_conf_neg, -log_softmax(pred_bboxes[i][4:], 4)])
+    def forward(self, pred_bboxes: torch.Tensor, default_bboxes: torch.Tensor, gt_bboxes: torch.Tensor, a: int = 1) -> torch.Tensor:
+        """calculate loss
 
-            pn, nn = split_pos_neg(len(l_conf_pos), len(l_conf_neg))
-            p_indices = l_conf_pos.sort(descending=True).indices[:pn]
-            n_indices = l_conf_neg.sort(descending=True).indices[:nn]
-            loss_ = (l_loc[p_indices].sum() + a * l_conf_pos[p_indices].sum()) / N
-            loss_ += a * l_conf_neg[n_indices].sum() / N
-            loss += loss_ / outputs.shape[0]
+        Args:
+            pred_bboxes (torch.Tensor)   : (N, P, 4 + C)
+            default_bboxes (torch.Tensor): (P, 4)
+            gt_bboxes (torch.Tensor)     : (N. G. 4 + C)
+            a (int, optional): weight term of loss formula. Defaults to 1.
+
+        Returns:
+            torch.Tensor: [description]
+        """
+        # constant definition
+        N = pred_bboxes.shape[0]
+        P = pred_bboxes.shape[1]
+        C = pred_bboxes.shape[2] - 4
+
+        # matching
+        is_match = match(gt=gt_bboxes, df=default_bboxes)
+
+        # localization loss
+        l = pred_bboxes[:, :, :4].unsqueeze(2)
+        g = calc_delta(gt=gt_bboxes, df=default_bboxes)
+        l_loc = (smooth_l1(l - g) * is_match).sum(dim=2)
+
+        # confidence loss
+        # positive
+        softmax_pos = softmax_cross_entropy(pr=pred_bboxes[:, :, 4:], gt=gt_bboxes[:, :, 4:])
+        l_conf = (softmax_pos * is_match).sum(dim=2)
+
+        # negative
+        gt_neg = torch.eye(C)[0].unsqueeze(0).unsqueeze(1)
+        softmax_neg = softmax_cross_entropy(pr=pred_bboxes[:, :, 4:], gt=gt_neg)
+        l_conf += (softmax_neg.squeeze() * ((is_match.sum(dim=2) == 0) * (-1)))
+
+        # hard negative mining
+        pos_num = (is_match.sum(dim=2) != 0).sum(dim=1)
+        neg_num = P - pos_num
+        pos_num, neg_num = split_pos_neg(pos_num, neg_num)
+
+        valid_mask = torch.stack([torch.kthvalue(l_conf[i], k=neg_num[i]).values for i in range(N)]).unsqueeze(1) > l_conf
+        valid_mask += -torch.stack([torch.kthvalue(-l_conf[i], k=pos_num[i]).values for i in range(N)]).unsqueeze(1) < l_conf
+
+        # calculate loss
+        loss = (((l_loc + a * l_conf.abs()) * valid_mask).sum(dim=1) / pos_num).mean()
+
         return loss
 
 
-def calc_iou(bbox1, bbox2):
-    cx1, cy1, w1, h1 = bbox1
-    cx2, cy2, w2, h2 = bbox2
-    w = torch.min(cx1 + w1/2, cx2 + w2/2) - torch.max(cx1 - w1/2, cx2 - w2/2)
-    h = torch.min(cy1 + h1/2, cy2 + h2/2) - torch.max(cy1 - h1/2, cy2 - h2/2)
-    if w > 0 and h > 0:
-        return w * h / (w1 * h1 + w2 * h2 - w * h)
-    else:
-        return torch.tensor(0.)
+def match(gt: torch.Tensor, df: torch.Tensor, threshold: float = 0.5) -> torch.Tensor:
+    """adapt matching strategy
 
+    Args:
+        gt (torch.Tensor): (N, G, 4) -> (N, 1, G, 4)
+        df (torch.Tensor): (P, 4) -> (1, P, 1, 4)
+        threshold (float, optional): threshold of iou. Defaults to 0.5.
 
-def calc_delta(gt_bbox, default_bbox):
-    g_cx, g_cy, g_w, g_h = gt_bbox
-    d_cx, d_cy, d_w, d_h = default_bbox
-    g_cx = (g_cx - d_cx) / d_w
-    g_cy = (g_cy - d_cy) / d_h
-    g_w = torch.log(g_w / d_w)
-    g_h = torch.log(g_h / d_h)
-    return torch.tensor([g_cx, g_cy, g_w, g_h])
+    Returns:
+        torch.Tensor: matching mask
+    """
+    gt = gt.unsqueeze(1)
+    df = df.unsqueeze(0).unsqueeze(2)
 
+    g_cx, g_cy, g_w, g_h = gt[:, :, :, 0], gt[:, :, :, 1], gt[:, :, :, 2], gt[:, :, :, 3]
+    d_cx, d_cy, d_w, d_h = df[:, :, :, 0], df[:, :, :, 1], df[:, :, :, 2], df[:, :, :, 3]
+    w = (torch.min(g_cx + g_w/2, d_cx + d_w/2) - torch.max(g_cx - g_w/2, d_cx - d_w/2)).clamp(min=0)
+    h = (torch.min(g_cy + g_h/2, d_cy + d_h/2) - torch.max(g_cy - g_h/2, d_cy - d_h/2)).clamp(min=0)
 
-def smooth_l1(x):
-    mask = torch.abs(x) < 1
-    return torch.sum(0.5 * x ** 2 * mask + (torch.abs(x) - 0.5) * (~mask)).unsqueeze(0)
-
-
-def log_softmax(y, t):
-    return torch.log(torch.exp(y) / torch.exp(y).sum())[[t]]
-
-
-def split_pos_neg(pos_num, neg_num):
-    if pos_num * 3 > neg_num:
-        return neg_num // 3, neg_num
-    else:
-        return pos_num, pos_num * 3
+    return (w * h / (g_w * g_h + d_w * d_h - w * h)) > threshold
