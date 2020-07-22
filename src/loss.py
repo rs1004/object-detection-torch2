@@ -3,18 +3,22 @@ import torch.nn as nn
 
 
 class SSDLoss(nn.Module):
-    def __init__(self):
-        # initialize
-        super(SSDLoss, self).__init__()
+    def __init__(self, a: int = 1) -> None:
+        """initialize
 
-    def forward(self, pred_bboxes: torch.Tensor, default_bboxes: torch.Tensor, gt_bboxes: torch.Tensor, a: int = 1) -> torch.Tensor:
+        Args:
+            a (int, optional): weight term of loss formula. Defaults to 1.
+        """
+        super(SSDLoss, self).__init__()
+        self.a = a
+
+    def forward(self, pred_bboxes: torch.Tensor, default_bboxes: torch.Tensor, gt_bboxes: torch.Tensor) -> torch.Tensor:
         """calculate loss
 
         Args:
             pred_bboxes (torch.Tensor)   : (N, P, 4 + C)
             default_bboxes (torch.Tensor): (P, 4)
             gt_bboxes (torch.Tensor)     : (N. G. 4 + C)
-            a (int, optional): weight term of loss formula. Defaults to 1.
 
         Returns:
             torch.Tensor: loss
@@ -51,7 +55,7 @@ class SSDLoss(nn.Module):
         valid_mask += -torch.stack([torch.kthvalue(-l_conf[i], k=pos_num[i]).values for i in range(N)]).unsqueeze(1) < l_conf
 
         # calculate loss
-        loss = (((l_loc + a * l_conf.abs()) * valid_mask).sum(dim=1) / pos_num).mean()
+        loss = (((l_loc + self.a * l_conf.abs()) * valid_mask).sum(dim=1) / pos_num).mean()
 
         return loss
 
@@ -69,8 +73,8 @@ class SSDLoss(nn.Module):
         gt = gt.unsqueeze(1)
         df = df.unsqueeze(0).unsqueeze(2)
 
-        g_cx, g_cy, g_w, g_h = gt[:, :, :, 0], gt[:, :, :, 1], gt[:, :, :, 2], gt[:, :, :, 3]
-        d_cx, d_cy, d_w, d_h = df[:, :, :, 0], df[:, :, :, 1], df[:, :, :, 2], df[:, :, :, 3]
+        g_cx, g_cy, g_w, g_h = [gt[:, :, :, i] for i in range(4)]
+        d_cx, d_cy, d_w, d_h = [df[:, :, :, i] for i in range(4)]
         w = (torch.min(g_cx + g_w/2, d_cx + d_w/2) - torch.max(g_cx - g_w/2, d_cx - d_w/2)).clamp(min=0)
         h = (torch.min(g_cy + g_h/2, d_cy + d_h/2) - torch.max(g_cy - g_h/2, d_cy - d_h/2)).clamp(min=0)
 
@@ -89,8 +93,8 @@ class SSDLoss(nn.Module):
         gt = gt.unsqueeze(1)
         df = df.unsqueeze(0).unsqueeze(2)
 
-        g_cx, g_cy, g_w, g_h = gt[:, :, :, 0], gt[:, :, :, 1], gt[:, :, :, 2], gt[:, :, :, 3]
-        d_cx, d_cy, d_w, d_h = df[:, :, :, 0], df[:, :, :, 1], df[:, :, :, 2], df[:, :, :, 3]
+        g_cx, g_cy, g_w, g_h = [gt[:, :, :, i] for i in range(4)]
+        d_cx, d_cy, d_w, d_h = [df[:, :, :, i] for i in range(4)]
         g_cx = (g_cx - d_cx) / d_w
         g_cy = (g_cy - d_cy) / d_h
         g_w = torch.log(g_w / d_w)
