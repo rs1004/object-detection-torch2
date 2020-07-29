@@ -1,7 +1,8 @@
 from dataset import PascalVOCDataset
-from model import VGG16
+from model import SSD
 from pathlib import Path
 from tqdm import tqdm
+from torch.nn.utils.rnn import pad_sequence
 from torch.optim.lr_scheduler import ExponentialLR
 import torchvision.transforms as transforms
 import torch.optim as optim
@@ -9,21 +10,33 @@ import torch
 import argparse
 
 
+def collate_fn(batch):
+    images = []
+    gts = []
+    for image, gt in batch:
+        images.append(image)
+        gts.append(gt)
+    images = torch.stack(images, dim=0)
+    gts = pad_sequence(gts, batch_first=True)
+    return images, gts
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--imsize', type=int, default=300)
+    parser.add_argument('--class_num', type=int, default=21)
     parser.add_argument('--batch_size', type=int, default=4)
     parser.add_argument('--epochs', type=int, default=1)
-    parser.add_argument('--model_weights_path', type=str, default='./vgg16_net.pth')
-    parser.add_argument('--min_loss_path', type=str, default='./vgg16_min_loss.txt')
+    parser.add_argument('--weights_path', type=str, default='./ssd_net.pth')
+    parser.add_argument('--weights_path_vgg16', type=str, default='./vgg16_bn_net.pth')
+    parser.add_argument('--min_loss_path', type=str, default='./min_loss.txt')
     args = parser.parse_args()
 
     transform = transforms.Compose([
-        transforms.RandomHorizontalFlip(p=0.5),
-        transforms.ToTensor()])
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
 
     dataset = PascalVOCDataset(
-        purpose='classification',
         data_dirs=['/work/data/VOCdevkit/VOC2007', '/work/data/VOCdevkit/VOC2012'],
         data_list_file_name='trainval.txt',
         imsize=args.imsize,
@@ -35,13 +48,11 @@ if __name__ == '__main__':
         shuffle=True,
         num_workers=10)
 
-    net = VGG16(
-        class_num=dataset.class_num
+    net = SSD(
+        num_classes=args.class_num,
+        weights_path=args.weights_path,
+        weights_path_vgg16=args.weights_path_vgg16
     )
-
-    if Path(args.model_weights_path).exists():
-        print('weights loaded.')
-        net.load_state_dict(torch.load(Path(args.model_weights_path)))
 
     if Path(args.min_loss_path).exists():
         print('min_loss loaded.')
@@ -59,20 +70,20 @@ if __name__ == '__main__':
     running_loss = 0.0
     for epoch in range(args.epochs):
         with tqdm(dataloader, total=len(dataloader)) as pbar:
-            for i, (images, labels) in enumerate(pbar):
+            for i, (images, gts) in enumerate(pbar):
                 # description
                 pbar.set_description(f'[Epoch {epoch+1}/{args.epochs}] loss: {running_loss}')
 
                 # to GPU device
                 images = images.to(device)
-                labels = labels.to(device)
+                gts = gts.to(device)
 
                 # zero the parameter gradients
                 optimizer.zero_grad()
 
                 # forward + backward + optimize
                 outputs = net(images)
-                loss = net.loss(output=outputs, target=labels)
+                loss = net.loss(pred_bboxes=outputs, default_bboxes=net.default_bboxes, gt_bboxes=gts)
                 loss.backward()
                 optimizer.step()
                 scheduler.step()
@@ -80,7 +91,7 @@ if __name__ == '__main__':
                 running_loss += loss.item()
 
             if (min_loss is None) or (running_loss < min_loss):
-                torch.save(net.state_dict(), args.model_weights_path)
+                torch.save(net.state_dict(), args.weights_path_vgg16)
                 min_loss = running_loss
                 with open(Path(args.min_loss_path), 'w') as f:
                     f.write(str(min_loss))
