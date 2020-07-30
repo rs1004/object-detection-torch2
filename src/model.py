@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from pathlib import Path
 
 
 class VGG16(nn.Module):
@@ -39,7 +40,7 @@ class VGG16(nn.Module):
         )
 
         # load weights
-        if weights_path:
+        if Path(weights_path).exists():
             self.load_state_dict(torch.load(weights_path))
         else:
             self._initialize_weights()
@@ -77,37 +78,62 @@ class SSD(nn.Module):
         self.num_classes = num_classes
         self.default_bboxes = self._get_default_bboxes()
 
-        # extra feature layer
-        layers = []
-        in_channels = 512
-        cfg = [(3, 1024), (1, 1024), (1, 256), (3, 512), (1, 128), (3, 256), (1, 128), (3, 256), (1, 128), (3, 256)]
-        str_2_layers = {3, 5, 7, 9}
-        for i, (k, v) in enumerate(cfg):
-            s = 2 if i in str_2_layers else 1
-            p = 1 if k == 3 and i < len(cfg) - 1 else 0
-            layers += [
-                nn.Conv2d(in_channels=in_channels, out_channels=v, kernel_size=k, stride=s, padding=p),
-                nn.BatchNorm2d(v),
-                nn.ReLU(inplace=True)
-            ]
-            in_channels = v
+        features = nn.ModuleDict()
 
+        # vgg16 layer
         vgg16 = VGG16(num_classes=num_classes_vgg16, weights_path=weights_path_vgg16)
-        vgg16_to_conv5_3 = [m for m in vgg16.features[:-1].modules() if not isinstance(m, nn.Sequential)]
+        num_table = {}
+        name_map = {'Conv2d': 'conv', 'BatchNorm2d': 'bn', 'ReLU': 'act', 'MaxPool2d': 'pool'}
+        layer_num = 1
+        for m in vgg16.features:
+            name = name_map[m._get_name()]
+            if name in num_table:
+                num_table[name] += 1
+                features[f'{name}_{layer_num}_{num_table[name]}'] = m
+            elif name == 'pool':
+                if layer_num < 5:
+                    features[f'{name}_{layer_num}'] = m
+                layer_num += 1
+                num_table.clear()
+            else:
+                num_table[name] = 1
+                features[f'{name}_{layer_num}_{num_table[name]}'] = m
 
-        self.features = nn.Sequential(*(vgg16_to_conv5_3 + layers))
+        # additional layer
+        sub_num = 1
+        in_channels = 512
+        cfg = [(3, 1024, 1, 1), '.',                    # layer6
+               (1, 1024, 1, 0), '.',                    # layer7
+               (1, 256, 1, 0), (3, 512, 2, 1), '.',     # layer8
+               (1, 128, 1, 0), (3, 256, 2, 1), '.',     # layer9
+               (1, 128, 1, 0), (3, 256, 1, 0), '.',     # layer10
+               (1, 128, 1, 0), (3, 256, 1, 0)]          # layer11
+        for c in cfg:
+            if c == '.':
+                layer_num += 1
+                sub_num = 1
+            else:
+                k, v, s, p = c
+                features[f'conv_{layer_num}_{sub_num}'] = nn.Conv2d(in_channels=in_channels, out_channels=v, kernel_size=k, stride=s, padding=p)
+                features[f'bn_{layer_num}_{sub_num}'] = nn.BatchNorm2d(v)
+                features[f'act_{layer_num}_{sub_num}'] = nn.ReLU(inplace=True)
 
-        self.classifier = {
-            32: nn.Conv2d(in_channels=512, out_channels=4*(num_classes+4), kernel_size=3, padding=1),
-            48: nn.Conv2d(in_channels=1024, out_channels=6*(num_classes+4), kernel_size=3, padding=1),
-            54: nn.Conv2d(in_channels=512, out_channels=6*(num_classes+4), kernel_size=3, padding=1),
-            60: nn.Conv2d(in_channels=256, out_channels=6*(num_classes+4), kernel_size=3, padding=1),
-            66: nn.Conv2d(in_channels=256, out_channels=4*(num_classes+4), kernel_size=3, padding=1),
-            72: nn.Conv2d(in_channels=256, out_channels=4*(num_classes+4), kernel_size=3, padding=1),
-        }
+                sub_num += 1
+                in_channels = v
+
+        self.features = features
+
+        self.classifier = nn.ModuleDict({
+            'act_4_3': nn.Conv2d(in_channels=512, out_channels=4*(num_classes+4), kernel_size=3, padding=1),
+            'act_7_1': nn.Conv2d(in_channels=1024, out_channels=6*(num_classes+4), kernel_size=3, padding=1),
+            'act_8_2': nn.Conv2d(in_channels=512, out_channels=6*(num_classes+4), kernel_size=3, padding=1),
+            'act_9_2': nn.Conv2d(in_channels=256, out_channels=6*(num_classes+4), kernel_size=3, padding=1),
+            'act_10_2': nn.Conv2d(in_channels=256, out_channels=4*(num_classes+4), kernel_size=3, padding=1),
+            'act_11_2': nn.Conv2d(in_channels=256, out_channels=4*(num_classes+4), kernel_size=3, padding=1),
+        })
 
         # load weights
-        if weights_path:
+        if Path(weights_path).exists():
             self.load_state_dict(torch.load(weights_path))
         else:
             self._initialize_weights()
@@ -115,11 +141,12 @@ class SSD(nn.Module):
     def forward(self, x):
         batch_size = x.size(0)
         y = torch.empty((batch_size, 0, self.num_classes + 4))
+        y = y.to(x.device)
 
-        for i, layer in enumerate(self.features):
+        for name, layer in self.features.items():
             x = layer(x)
-            if i in self.classifier:
-                y = torch.cat([y, self.classifier[i](x).view(batch_size, -1, self.num_classes + 4)], dim=1)
+            if name in self.classifier:
+                y = torch.cat([y, self.classifier[name](x).view(batch_size, -1, self.num_classes + 4)], dim=1)
 
         return y
 
@@ -146,8 +173,12 @@ class SSD(nn.Module):
         return default_bboxes
 
     def _initialize_weights(self):
-        for i, m in enumerate(self.modules()):
-            if i <= 42: continue
+        is_vgg = True
+        for k, m in self.features.items():
+            if k == 'conv_6_1':
+                is_vgg = False
+            if is_vgg:
+                continue
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(
                     m.weight, mode='fan_out', nonlinearity='relu')
@@ -156,9 +187,13 @@ class SSD(nn.Module):
             elif isinstance(m, nn.BatchNorm2d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.Linear):
-                nn.init.normal_(m.weight, 0, 0.01)
-                nn.init.constant_(m.bias, 0)
+
+        for m in self.classifier.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(
+                    m.weight, mode='fan_out', nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
 
     def loss(self, pred_bboxes: torch.Tensor, default_bboxes: torch.Tensor, gt_bboxes: torch.Tensor) -> torch.Tensor:
         """calculate loss
