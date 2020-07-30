@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 class VGG16(nn.Module):
-    def __init__(self, num_classes=1000, weights_path=None):
+    def __init__(self):
         # initialize
         super(VGG16, self).__init__()
 
@@ -36,14 +36,12 @@ class VGG16(nn.Module):
             nn.Linear(4096, 4096),
             nn.ReLU(inplace=True),
             nn.Dropout(),
-            nn.Linear(4096, num_classes)
+            nn.Linear(4096, 1000)
         )
 
         # load weights
-        if Path(weights_path).exists():
-            self.load_state_dict(torch.load(weights_path))
-        else:
-            self._initialize_weights()
+        vgg16_bn = torch.hub.load('pytorch/vision:v0.6.0', 'vgg16_bn', pretrained=True)
+        self.load_state_dict(vgg16_bn.state_dict())
 
     def forward(self, x):
         x = self.features(x)
@@ -81,7 +79,7 @@ class SSD(nn.Module):
         features = nn.ModuleDict()
 
         # vgg16 layer
-        vgg16 = torch.hub.load('pytorch/vision:v0.6.0', 'vgg16_bn', pretrained=True)
+        vgg16 = VGG16()
         num_table = {}
         name_map = {'Conv2d': 'conv', 'BatchNorm2d': 'bn', 'ReLU': 'act', 'MaxPool2d': 'pool'}
         layer_num = 1
