@@ -72,7 +72,7 @@ class VGG16(nn.Module):
 
 
 class SSD(nn.Module):
-    def __init__(self, num_classes, num_classes_vgg16=1000, weights_path=None, weights_path_vgg16=None):
+    def __init__(self, num_classes, weights_path=None):
         # initialize
         super(SSD, self).__init__()
         self.num_classes = num_classes
@@ -81,11 +81,13 @@ class SSD(nn.Module):
         features = nn.ModuleDict()
 
         # vgg16 layer
-        vgg16 = VGG16(num_classes=num_classes_vgg16, weights_path=weights_path_vgg16)
+        vgg16 = torch.hub.load('pytorch/vision:v0.6.0', 'vgg16_bn', pretrained=True)
         num_table = {}
         name_map = {'Conv2d': 'conv', 'BatchNorm2d': 'bn', 'ReLU': 'act', 'MaxPool2d': 'pool'}
         layer_num = 1
         for m in vgg16.features:
+            for param in m.parameters():
+                param.requires_grad = False
             name = name_map[m._get_name()]
             if name in num_table:
                 num_table[name] += 1
@@ -195,13 +197,14 @@ class SSD(nn.Module):
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
 
-    def loss(self, pred_bboxes: torch.Tensor, default_bboxes: torch.Tensor, gt_bboxes: torch.Tensor) -> torch.Tensor:
+    def loss(self, pred_bboxes: torch.Tensor, default_bboxes: torch.Tensor, gt_bboxes: torch.Tensor, a: int = 1) -> torch.Tensor:      
         """calculate loss
 
         Args:
             pred_bboxes (torch.Tensor)   : (N, P, 4 + C)
             default_bboxes (torch.Tensor): (P, 4)
             gt_bboxes (torch.Tensor)     : (N. G. 4 + C)
+            a (int, optional): weight term of loss formula. Defaults to 1.
 
         Returns:
             torch.Tensor: loss
@@ -225,7 +228,7 @@ class SSD(nn.Module):
         l_conf = (softmax_pos * is_match).sum(dim=2)
 
         # negative
-        gt_neg = torch.eye(C)[0].unsqueeze(0).unsqueeze(1)
+        gt_neg = torch.eye(C)[0].unsqueeze(0).unsqueeze(1).to(pred_bboxes.device)
         softmax_neg = self.softmax_cross_entropy(pr=pred_bboxes[:, :, 4:], gt=gt_neg)
         l_conf += (softmax_neg.squeeze() * ((is_match.sum(dim=2) == 0) * (-1)))
 
@@ -238,7 +241,7 @@ class SSD(nn.Module):
         valid_mask += -torch.stack([torch.kthvalue(-l_conf[i], k=pos_num[i]).values for i in range(N)]).unsqueeze(1) < l_conf
 
         # calculate loss
-        loss = (((l_loc + self.a * l_conf.abs()) * valid_mask).sum(dim=1) / pos_num).mean()
+        loss = (((l_loc + a * l_conf.abs()) * valid_mask).sum(dim=1) / pos_num).mean()
 
         return loss
 

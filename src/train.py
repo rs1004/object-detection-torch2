@@ -28,7 +28,6 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=4)
     parser.add_argument('--epochs', type=int, default=1)
     parser.add_argument('--weights_path', type=str, default='./ssd_net.pth')
-    parser.add_argument('--weights_path_vgg16', type=str, default='./vgg16_bn_net.pth')
     parser.add_argument('--min_loss_path', type=str, default='./min_loss.txt')
     args = parser.parse_args()
 
@@ -46,12 +45,12 @@ if __name__ == '__main__':
         dataset=dataset,
         batch_size=args.batch_size,
         shuffle=True,
-        num_workers=10)
+        num_workers=10,
+        collate_fn=collate_fn)
 
     net = SSD(
         num_classes=args.class_num,
         weights_path=args.weights_path,
-        weights_path_vgg16=args.weights_path_vgg16
     )
 
     if Path(args.min_loss_path).exists():
@@ -66,6 +65,7 @@ if __name__ == '__main__':
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     net.to(device)
+    defaults = net.default_bboxes.to(device)
 
     running_loss = 0.0
     for epoch in range(args.epochs):
@@ -83,7 +83,7 @@ if __name__ == '__main__':
 
                 # forward + backward + optimize
                 outputs = net(images)
-                loss = net.loss(pred_bboxes=outputs, default_bboxes=net.default_bboxes, gt_bboxes=gts)
+                loss = net.loss(pred_bboxes=outputs, default_bboxes=defaults, gt_bboxes=gts)
                 loss.backward()
                 optimizer.step()
                 scheduler.step()
