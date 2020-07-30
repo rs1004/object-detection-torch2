@@ -5,6 +5,7 @@ data.tar
 
 # practice
 ren*
+.vscode
 
 # cache
 __pycache__
