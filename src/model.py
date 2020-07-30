@@ -256,8 +256,8 @@ class SSD(nn.Module):
         neg_num = P - pos_num
         pos_num, neg_num = self.split_pos_neg(pos_num, neg_num)
 
-        valid_mask = torch.stack([torch.kthvalue(l_conf[i], k=neg_num[i]).values for i in range(N)]).unsqueeze(1) > l_conf
-        valid_mask += -torch.stack([torch.kthvalue(-l_conf[i], k=pos_num[i]).values for i in range(N)]).unsqueeze(1) < l_conf
+        valid_mask = torch.stack([self.kthvalue(l_conf[i], k=neg_num[i], mode='min') for i in range(N)]).unsqueeze(1) > l_conf
+        valid_mask += -torch.stack([self.kthvalue(-l_conf[i], k=pos_num[i], mode='max') for i in range(N)]).unsqueeze(1) < l_conf
 
         # calculate loss
         loss = (((l_loc + a * l_conf.abs()) * valid_mask).sum(dim=1) / pos_num).mean()
@@ -347,3 +347,22 @@ class SSD(nn.Module):
         """
         cond = pos_num * 3 > neg_num
         return torch.where(cond, neg_num // 3, pos_num), torch.where(cond, neg_num, pos_num * 3)
+    
+    def kthvalue(self, tensor: torch.Tensor, k: torch.Tensor, mode: str) -> torch.Tensor:
+        """get kthvalue from tensor
+
+        Args:
+            tensor (torch.Tensor): (P)
+            k (torch.Tensor): (1)
+            mode (str): 'min' or 'max'
+
+        Returns:
+            torch.Tensor: kth value
+        """        
+        if k > 0:
+            return torch.kthvalue(tensor, k=k).values
+        else:
+            if mode == 'min':
+                return torch.kthvalue(tensor, k=1).values - 1
+            elif mode == 'max':
+                return torch.kthvalue(tensor, k=1).values + 1
