@@ -91,7 +91,7 @@ if __name__ == '__main__':
                 running_loss += loss.item()
 
             if (min_loss is None) or (running_loss < min_loss):
-                torch.save(net.state_dict(), args.weights_path_vgg16)
+                torch.save(net.state_dict(), args.weights_path)
                 min_loss = running_loss
                 with open(Path(args.min_loss_path), 'w') as f:
                     f.write(str(min_loss))

@@ -259,8 +259,8 @@ class SSD(nn.Module):
         valid_mask = torch.stack([self.kthvalue(l_conf[i], k=neg_num[i], mode='min') for i in range(N)]).unsqueeze(1) > l_conf
         valid_mask += -torch.stack([self.kthvalue(-l_conf[i], k=pos_num[i], mode='max') for i in range(N)]).unsqueeze(1) < l_conf
 
-        # calculate loss
-        loss = (((l_loc + a * l_conf.abs()) * valid_mask).sum(dim=1) / pos_num).mean()
+        # calculate loss (if pos_num = 0, then loss = 0)
+        loss = (((l_loc + a * l_conf.abs()) * valid_mask).sum(dim=1) * (pos_num != 0) / (pos_num + 10e-10)).mean()
 
         return loss
 
