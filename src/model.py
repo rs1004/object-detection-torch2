@@ -197,7 +197,28 @@ class SSD(nn.Module):
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
 
-    def loss(self, pred_bboxes: torch.Tensor, default_bboxes: torch.Tensor, gt_bboxes: torch.Tensor, a: int = 1) -> torch.Tensor:      
+    def train_params(self) -> None:
+        """generate params to train 
+
+        Yields:
+            nn.parameter.Parameter: trainable params
+        """
+        # generate features params
+        is_vgg = True
+        for name, layer in self.features.items():
+            if name == 'conv_6_1':
+                is_vgg = False
+            if is_vgg:
+                continue
+            for param in layer.parameters():
+                yield param
+
+        # generate classifier params
+        for _, layer in self.classifier.items():
+            for param in layer.parameters():
+                yield param
+
+    def loss(self, pred_bboxes: torch.Tensor, default_bboxes: torch.Tensor, gt_bboxes: torch.Tensor, a: int = 1) -> torch.Tensor:
         """calculate loss
 
         Args:
