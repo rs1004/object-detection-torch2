@@ -60,7 +60,7 @@ if __name__ == '__main__':
     else:
         min_loss = None
 
-    optimizer = optim.Adam(net.parameters(), lr=0.0001, weight_decay=0.0001)
+    optimizer = optim.SGD(net.train_params(), lr=0.001, momentum=0.9, weight_decay=0.0005)
     scheduler = ExponentialLR(optimizer, gamma=0.95)
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
