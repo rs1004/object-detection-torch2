@@ -260,7 +260,8 @@ class SSD(nn.Module):
         valid_mask += -torch.stack([self.kthvalue(-l_conf[i], k=pos_num[i], mode='max') for i in range(B)]).unsqueeze(1) < l_conf
 
         # calculate loss (if pos_num = 0, then loss = 0)
-        loss = (((l_loc + a * l_conf.abs()) * valid_mask).sum(dim=1) * (pos_num != 0) / (pos_num + 10e-10)).mean()
+        pos_num = torch.where(pos_num > 0, 1/pos_num, pos_num).float()
+        loss = (((l_loc + a * l_conf.abs()) * valid_mask).sum(dim=1) * pos_num).mean()
 
         return loss
 
@@ -302,8 +303,8 @@ class SSD(nn.Module):
         d_cx, d_cy, d_w, d_h = [df[:, :, :, i] for i in range(4)]
         g_cx = (g_cx - d_cx) / d_w
         g_cy = (g_cy - d_cy) / d_h
-        g_w = torch.log(g_w / d_w)
-        g_h = torch.log(g_h / d_h)
+        g_w = torch.where(g_w > 0, torch.log(g_w / d_w), g_w)
+        g_h = torch.where(g_w > 0, torch.log(g_w / d_w), g_w)
 
         return torch.stack([g_cx, g_cy, g_w, g_h], dim=3)
 
