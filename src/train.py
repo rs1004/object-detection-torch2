@@ -108,9 +108,9 @@ if __name__ == '__main__':
                 # save weights
                 torch.save(net.state_dict(), weights_path)
                 # save params
-                params = {'min_loss': running_loss, 'lr': scheduler.get_lr()}
+                params = {'min_loss': running_loss, 'lr': scheduler.get_last_lr()[0]}
                 with open(params_path, 'w') as f:
-                    json.dump(params, f)
+                    json.dump(params, f, indent=4)
             running_loss = 0.0
 
     print('Finished Training')
