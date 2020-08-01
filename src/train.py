@@ -8,6 +8,7 @@ import torchvision.transforms as transforms
 import torch.optim as optim
 import torch
 import argparse
+import json
 
 
 def collate_fn(batch):
@@ -27,9 +28,17 @@ if __name__ == '__main__':
     parser.add_argument('--class_num', type=int, default=21)
     parser.add_argument('--batch_size', type=int, default=4)
     parser.add_argument('--epochs', type=int, default=1)
-    parser.add_argument('--weights_path', type=str, default='./ssd_net.pth')
-    parser.add_argument('--min_loss_path', type=str, default='./min_loss.txt')
+    parser.add_argument('--lr', type=float, default=0.0001)
+    parser.add_argument('--weight_decay', type=float, default=0.0005)
+    parser.add_argument('--gamma', type=float, default=0.95)
+    parser.add_argument('--num_workers', type=int, default=8)
+    parser.add_argument('--result_dir', type=str, default='./result/train')
+    parser.add_argument('--weights', type=str, default='weights.pth')
+    parser.add_argument('--params', type=str, default='params.json')
     args = parser.parse_args()
+
+    weights_path = Path(args.result_dir) / args.weights
+    params_path = Path(args.result_dir) / args.params
 
     transform = transforms.Compose([
         transforms.ToTensor(),
@@ -45,23 +54,26 @@ if __name__ == '__main__':
         dataset=dataset,
         batch_size=args.batch_size,
         shuffle=True,
-        num_workers=10,
+        num_workers=args.num_workers,
         collate_fn=collate_fn)
 
     net = SSD(
         num_classes=args.class_num,
-        weights_path=args.weights_path,
+        weights_path=weights_path,
     )
 
-    if Path(args.min_loss_path).exists():
-        print('min_loss loaded.')
-        with open(Path(args.min_loss_path), 'r') as f:
-            min_loss = float(f.readlines()[0])
+    if params_path.exists():
+        print('Params loaded.')
+        with open(params_path), 'r') as f:
+            params = json.load(f)
+        min_loss = params['min_loss']
+        lr = params['lr']
     else:
         min_loss = None
+        lr = args.lr
 
-    optimizer = optim.SGD(net.train_params(), lr=0.001, momentum=0.9, weight_decay=0.0005)
-    scheduler = ExponentialLR(optimizer, gamma=0.95)
+    optimizer = optim.Adam(net.train_params(), lr=lr, weight_decay=args.weight_decay)
+    scheduler = ExponentialLR(optimizer, gamma=args.gamma)
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     net.to(device)
@@ -70,9 +82,9 @@ if __name__ == '__main__':
     running_loss = 0.0
     for epoch in range(args.epochs):
         with tqdm(dataloader, total=len(dataloader)) as pbar:
-            for i, (images, gts) in enumerate(pbar):
+            for i, (images, gts) in enumerate(pbar, start=1):
                 # description
-                pbar.set_description(f'[Epoch {epoch+1}/{args.epochs}] loss: {running_loss}')
+                pbar.set_description(f'[Epoch {epoch+1}/{args.epochs}] loss: {running_loss/i}')
 
                 # to GPU device
                 images = images.to(device)
@@ -90,11 +102,15 @@ if __name__ == '__main__':
 
                 running_loss += loss.item()
 
+            running_loss /= i
             if (min_loss is None) or (running_loss < min_loss):
-                torch.save(net.state_dict(), args.weights_path)
-                min_loss = running_loss
-                with open(Path(args.min_loss_path), 'w') as f:
-                    f.write(str(min_loss))
+                Path(args.result_dir).mkdir(parents=True, exist_ok=True)
+                # save weights
+                torch.save(net.state_dict(), weights_path)
+                # save params
+                params = {'min_loss': running_loss, 'lr': scheduler.get_lr()}
+                with open(params_path, 'w') as f:
+                    json.dump(params, f)
             running_loss = 0.0
 
     print('Finished Training')
