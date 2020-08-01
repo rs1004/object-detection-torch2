@@ -64,7 +64,7 @@ if __name__ == '__main__':
 
     if params_path.exists():
         print('Params loaded.')
-        with open(params_path), 'r') as f:
+        with open(params_path, 'r') as f:
             params = json.load(f)
         min_loss = params['min_loss']
         lr = params['lr']
