@@ -32,13 +32,13 @@ if __name__ == '__main__':
     parser.add_argument('--weight_decay', type=float, default=0.0005)
     parser.add_argument('--gamma', type=float, default=0.95)
     parser.add_argument('--num_workers', type=int, default=8)
-    parser.add_argument('--result_dir', type=str, default='./result/train')
+    parser.add_argument('--result_dir', type=str, default='./result')
     parser.add_argument('--weights', type=str, default='weights.pth')
     parser.add_argument('--params', type=str, default='params.json')
     args = parser.parse_args()
 
-    weights_path = Path(args.result_dir) / args.weights
-    params_path = Path(args.result_dir) / args.params
+    weights_path = Path(args.result_dir) / ' train' / args.weights
+    params_path = Path(args.result_dir) / 'train' / args.params
 
     transform = transforms.Compose([
         transforms.ToTensor(),

@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from pathlib import Path
 
 
 class VGG16(nn.Module):
@@ -132,9 +133,9 @@ class SSD(nn.Module):
         })
 
         # load weights
-        if weights_path.exists():
+        if weights_path and weights_path.exists():
             print('weights loaded.')
-            self.load_state_dict(torch.load(weights_path))
+            self.load_state_dict(torch.load(weights_path.as_posix()))
         else:
             self._initialize_weights()
 
