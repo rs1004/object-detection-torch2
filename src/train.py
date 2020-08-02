@@ -1,5 +1,5 @@
-from dataset import PascalVOCDataset
-from model import SSD
+from dataset import PascalVOCDataset, Purpose
+from model import VGG16, SSD
 from pathlib import Path
 from tqdm import tqdm
 from torch.nn.utils.rnn import pad_sequence
@@ -24,6 +24,7 @@ def collate_fn(batch):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--purpose', type=str, default='detection')
     parser.add_argument('--imsize', type=int, default=300)
     parser.add_argument('--class_num', type=int, default=21)
     parser.add_argument('--batch_size', type=int, default=4)
@@ -37,13 +38,14 @@ if __name__ == '__main__':
     parser.add_argument('--params', type=str, default='params.json')
     args = parser.parse_args()
 
-    weights_path = Path(args.result_dir) / ' train' / args.weights
-    params_path = Path(args.result_dir) / 'train' / args.params
+    weights_path = Path(args.result_dir) / ' train' / args.purpose /args.weights
+    params_path = Path(args.result_dir) / 'train' / args.purpose / args.params
 
     transform = transforms.Compose([
         transforms.ToTensor()])
 
     dataset = PascalVOCDataset(
+        purpose=args.purpose,
         data_dirs=['/work/data/VOCdevkit/VOC2007', '/work/data/VOCdevkit/VOC2012'],
         data_list_file_name='trainval.txt',
         imsize=args.imsize,
@@ -56,10 +58,21 @@ if __name__ == '__main__':
         num_workers=args.num_workers,
         collate_fn=collate_fn)
 
-    net = SSD(
-        num_classes=args.class_num,
-        weights_path=weights_path,
-    )
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    if args.purpose == Purpose.CLASSIFICATION:
+        net = VGG16(
+            num_classes=args.class_num,
+            weights_path=weights_path,
+        )
+        loss_args = {}
+    elif args.purpose == Purpose.DETECTION:
+        net = SSD(
+            num_classes=args.class_num,
+            weights_path=weights_path,
+        )
+        defaults = net.default_bboxes.to(device)
+        loss_args = {'default_bboxes': defaults}
+    net.to(device)
 
     if params_path.exists():
         print('Params loaded.')
@@ -73,10 +86,6 @@ if __name__ == '__main__':
 
     optimizer = optim.Adam(net.train_params(), lr=lr, weight_decay=args.weight_decay)
     scheduler = ExponentialLR(optimizer, gamma=args.gamma)
-
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    net.to(device)
-    defaults = net.default_bboxes.to(device)
 
     running_loss = 0.0
     for epoch in range(args.epochs):
@@ -94,7 +103,8 @@ if __name__ == '__main__':
 
                 # forward + backward + optimize
                 outputs = net(images)
-                loss = net.loss(pred_bboxes=outputs, default_bboxes=defaults, gt_bboxes=gts)
+                loss_args.update({'outputs': outputs, 'targets': gts})
+                loss = net.loss(*loss_args)
                 loss.backward()
                 optimizer.step()
                 scheduler.step()

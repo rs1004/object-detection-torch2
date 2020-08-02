@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 class VGG16(nn.Module):
-    def __init__(self):
+    def __init__(self, weights_path=None):
         # initialize
         super(VGG16, self).__init__()
 
@@ -40,8 +40,12 @@ class VGG16(nn.Module):
         )
 
         # load weights
-        vgg16_bn = torch.hub.load('pytorch/vision:v0.6.0', 'vgg16_bn', pretrained=True)
-        self.load_state_dict(vgg16_bn.state_dict())
+        if weights_path and weights_path.exists():
+            print('weights loaded.')
+            self.load_state_dict(torch.load(weights_path.as_posix()))
+        else:
+            vgg16_bn = torch.hub.load('pytorch/vision:v0.6.0', 'vgg16_bn', pretrained=True)
+            self.load_state_dict(vgg16_bn.state_dict())
 
     def forward(self, x):
         x = self.features(x)
@@ -49,24 +53,10 @@ class VGG16(nn.Module):
         x = self.classifier(x)
         return x
 
-    def loss(self, output, target):
-        output = F.softmax(output, dim=1)
-        loss = nn.CrossEntropyLoss()(input=output, target=target)
+    def loss(self, outputs, targets):
+        outputs = F.softmax(outputs, dim=1)
+        loss = nn.CrossEntropyLoss()(input=outputs, target=targets)
         return loss
-
-    def _initialize_weights(self):
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(
-                    m.weight, mode='fan_out', nonlinearity='relu')
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.BatchNorm2d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.Linear):
-                nn.init.normal_(m.weight, 0, 0.01)
-                nn.init.constant_(m.bias, 0)
 
 
 class SSD(nn.Module):
@@ -218,39 +208,39 @@ class SSD(nn.Module):
             for param in layer.parameters():
                 yield param
 
-    def loss(self, pred_bboxes: torch.Tensor, default_bboxes: torch.Tensor, gt_bboxes: torch.Tensor, a: int = 1) -> torch.Tensor:
+    def loss(self, outputs: torch.Tensor, targets: torch.Tensor, default_bboxes: torch.Tensor, a: int = 1) -> torch.Tensor:
         """calculate loss
 
         Args:
-            pred_bboxes (torch.Tensor)   : (B, P, 4 + C)
+            outputs (torch.Tensor)   : (B, P, 4 + C)
+            targets (torch.Tensor)     : (B. G. 4 + C)
             default_bboxes (torch.Tensor): (P, 4)
-            gt_bboxes (torch.Tensor)     : (B. G. 4 + C)
             a (int, optional): weight term of loss formula. Defaults to 1.
 
         Returns:
             torch.Tensor: loss
         """
         # constant definition
-        B = pred_bboxes.shape[0]
-        P = pred_bboxes.shape[1]
-        C = pred_bboxes.shape[2] - 4
+        B = outputs.shape[0]
+        P = outputs.shape[1]
+        C = outputs.shape[2] - 4
 
         # matching
-        is_match = self.match(gt=gt_bboxes, df=default_bboxes)
+        is_match = self.match(gt=targets, df=default_bboxes)
 
         # localization loss
-        l = pred_bboxes[:, :, :4].unsqueeze(2)
-        g = self.calc_delta(gt=gt_bboxes, df=default_bboxes)
+        l = outputs[:, :, :4].unsqueeze(2)
+        g = self.calc_delta(gt=targets, df=default_bboxes)
         l_loc = (self.smooth_l1(l - g) * is_match).sum(dim=2)
 
         # confidence loss
         # positive
-        softmax_pos = self.softmax_cross_entropy(pr=pred_bboxes[:, :, 4:], gt=gt_bboxes[:, :, 4:])
+        softmax_pos = self.softmax_cross_entropy(pr=outputs[:, :, 4:], gt=targets[:, :, 4:])
         l_conf = (softmax_pos * is_match).sum(dim=2)
 
         # negative
-        gt_neg = torch.eye(C)[0].unsqueeze(0).unsqueeze(1).to(pred_bboxes.device)
-        softmax_neg = self.softmax_cross_entropy(pr=pred_bboxes[:, :, 4:], gt=gt_neg)
+        gt_void = torch.eye(C)[0].unsqueeze(0).unsqueeze(1).to(outputs.device)
+        softmax_neg = self.softmax_cross_entropy(pr=outputs[:, :, 4:], gt=gt_void)
         l_conf += (softmax_neg.squeeze() * ((is_match.sum(dim=2) == 0) * (-1)))
 
         # hard negative mining

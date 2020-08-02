@@ -1,14 +1,18 @@
 from torch.utils.data import Dataset
 from pathlib import Path
 from PIL import Image
+from enum import Enum
 import xml.etree.ElementTree as ET
 import json
 import torch
 
 
 class PascalVOCDataset(Dataset):
-    def __init__(self, data_dirs, data_list_file_name, imsize, transform=None):
+    def __init__(self, purpose, data_dirs, data_list_file_name, imsize, transform=None):
         self.transform = transform
+        self.purpose = purpose
+        if self.purpose not in Purpose.show_all():
+            raise ValueError(f'purpose "{self.purpose}" is isvalid')
         self.imsize = imsize
         self.data_list = self._get_list(data_dirs, data_list_file_name)
         self.label_map = self._get_label_map()
@@ -17,12 +21,21 @@ class PascalVOCDataset(Dataset):
         return len(self.data_list)
 
     def __getitem__(self, i):
-        image_path, label_path = self.data_list[i]
+        if self.purpose == Purpose.CLASSIFICATION:
+            class_name, coord, image_path = self.data_list[i]
 
-        image = Image.open(image_path).resize((self.imsize, self.imsize))
-        if self.transform:
-            image = self.transform(image)
-        gt = self._get_gt(label_path)
+            image = Image.open(image_path).crop(coord).resize((self.imsize, self.imsize))
+            if self.transform:
+                image = self.transform(image)
+            gt = self.label_map[class_name]
+
+        elif self.purpose == Purpose.DETECTION:
+            image_path, gt_path = self.data_list[i]
+
+            image = Image.open(image_path).resize((self.imsize, self.imsize))
+            if self.transform:
+                image = self.transform(image)
+            gt = self._get_gt(gt_path)
 
         return image, gt
 
@@ -39,8 +52,16 @@ class PascalVOCDataset(Dataset):
 
             for i in ids[:-1]:
                 image_path = Path(data_dir) / 'JPEGImages' / f'{i}.jpg'
-                label_path = Path(data_dir) / 'Annotations' / f'{i}.xml'
-                data_list.append([image_path, label_path])
+                gt_path = Path(data_dir) / 'Annotations' / f'{i}.xml'
+                if self.purpose == Purpose.CLASSIFICATION:
+                    root = ET.parse(gt_path).getroot()
+                    for obj in root.iter('object'):
+                        class_name = obj.find('name').text
+                        bbox = obj.find('bndbox')
+                        coord = int(bbox.find('xmin').text), int(bbox.find('ymin').text), int(bbox.find('xmax').text), int(bbox.find('ymax').text)
+                        data_list.append([class_name, coord, image_path])
+                elif self.purpose == Purpose.DETECTION:
+                    data_list.append([image_path, gt_path])
 
         return data_list
 
@@ -51,10 +72,10 @@ class PascalVOCDataset(Dataset):
         label_map = {label: i for i, label in enumerate(labels)}
         return label_map
 
-    def _get_gt(self, label_path):
+    def _get_gt(self, gt_path):
         class_num = len(self.label_map) + 1
 
-        root = ET.parse(label_path).getroot()
+        root = ET.parse(gt_path).getroot()
         gt = torch.empty(0, 4 + class_num)
         for obj in root.iter('object'):
             bbox = obj.find('bndbox')
@@ -65,3 +86,12 @@ class PascalVOCDataset(Dataset):
             t = torch.cat([offset, score]).unsqueeze(0)
             gt = torch.cat([gt, t], dim=0)
         return gt
+
+
+class Purpose(Enum):
+    CLASSIFICATION = 'classification'
+    DETECTION = 'detection'
+
+    @classmethod
+    def show_all(cls):
+        return set(c.value for c in cls)
