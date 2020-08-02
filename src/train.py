@@ -38,7 +38,7 @@ if __name__ == '__main__':
     parser.add_argument('--params', type=str, default='params.json')
     args = parser.parse_args()
 
-    weights_path = Path(args.result_dir) / ' train' / args.purpose /args.weights
+    weights_path = Path(args.result_dir) / ' train' / args.purpose / args.weights
     params_path = Path(args.result_dir) / 'train' / args.purpose / args.params
 
     transform = transforms.Compose([

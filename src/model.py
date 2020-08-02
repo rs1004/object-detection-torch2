@@ -340,7 +340,7 @@ class SSD(nn.Module):
         """
         cond = pos_num * 3 > neg_num
         return torch.where(cond, neg_num // 3, pos_num), torch.where(cond, neg_num, pos_num * 3)
-    
+
     def kthvalue(self, tensor: torch.Tensor, k: torch.Tensor, mode: str) -> torch.Tensor:
         """get kthvalue from tensor
 
@@ -351,7 +351,7 @@ class SSD(nn.Module):
 
         Returns:
             torch.Tensor: kth value
-        """        
+        """
         if k > 0:
             return torch.kthvalue(tensor, k=k).values
         else:
