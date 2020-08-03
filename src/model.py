@@ -50,10 +50,6 @@ class VGG16(nn.Module):
             nn.Dropout(),
             nn.Linear(4096, num_classes)
         )
-        if self.transfer_learning:
-            for m in self.features.modules():
-                for param in m.parameters():
-                    param.requires_grad = False
 
         # load weights
         if weights_path and weights_path.exists():
@@ -61,8 +57,13 @@ class VGG16(nn.Module):
             self.load_state_dict(torch.load(weights_path.as_posix()))
         else:
             vgg16_bn = torch.hub.load('pytorch/vision:v0.6.0', 'vgg16_bn', pretrained=True)
-            self.load_state_dict(vgg16_bn.state_dict())
+            self.load_state_dict(vgg16_bn.state_dict(), strict=False)
             self._initialize_weights()
+
+        if self.transfer_learning:
+            for m in self.features.modules():
+                for param in m.parameters():
+                    param.requires_grad = False
 
     def _initialize_weights(self):
         for m in self.classifier2.modules():
@@ -163,7 +164,7 @@ class SSD(nn.Module):
         for name, layer in self.features.items():
             x = layer(x)
             if name in self.classifier:
-                y_ = self.classifier[name](x).permute(0, 2, 3, 1).view(batch_size, -1, self.num_classes + 4)
+                y_ = self.classifier[name](x).permute(0, 2, 3, 1).reshape(batch_size, -1, self.num_classes + 4)
                 y = torch.cat([y, y_], dim=1)
 
         return y

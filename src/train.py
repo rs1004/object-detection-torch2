@@ -37,7 +37,7 @@ if __name__ == '__main__':
     parser.add_argument('--params', type=str, default='params.json')
     args = parser.parse_args()
 
-    weights_path = Path(args.result_dir) / ' train' / args.purpose / args.weights
+    weights_path = Path(args.result_dir) / 'train' / args.purpose / args.weights
     params_path = Path(args.result_dir) / 'train' / args.purpose / args.params
 
     transform = transforms.Compose([
@@ -58,17 +58,17 @@ if __name__ == '__main__':
         collate_fn=collate_fn)
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    if args.purpose == Purpose.CLASSIFICATION:
+    if args.purpose == Purpose.CLASSIFICATION.value:
         net = VGG16(
             num_classes=dataset.num_classes,
             weights_path=weights_path
         )
         loss_args = {}
-    elif args.purpose == Purpose.DETECTION:
+    elif args.purpose == Purpose.DETECTION.value:
         net = SSD(
-            num_classes=dataset.num_classes + 1, # add void
+            num_classes=dataset.num_classes + 1,  # add void
             weights_path=weights_path,
-            weights_path_vgg16=Path(args.result_dir) / ' train' / 'classification' / args.weights
+            weights_path_vgg16=Path(args.result_dir) / 'train' / 'classification' / args.weights
         )
         defaults = net.default_bboxes.to(device)
         loss_args = {'default_bboxes': defaults}
@@ -104,7 +104,7 @@ if __name__ == '__main__':
                 # forward + backward + optimize
                 outputs = net(images)
                 loss_args.update({'outputs': outputs, 'targets': gts})
-                loss = net.loss(*loss_args)
+                loss = net.loss(**loss_args)
                 loss.backward()
                 optimizer.step()
                 scheduler.step()
@@ -113,7 +113,7 @@ if __name__ == '__main__':
 
             running_loss /= i
             if (min_loss is None) or (running_loss < min_loss):
-                Path(args.result_dir).mkdir(parents=True, exist_ok=True)
+                weights_path.parent.mkdir(parents=True, exist_ok=True)
                 # save weights
                 torch.save(net.state_dict(), weights_path)
                 # save params

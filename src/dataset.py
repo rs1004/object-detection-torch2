@@ -22,7 +22,7 @@ class PascalVOCDataset(Dataset):
         return len(self.data_list)
 
     def __getitem__(self, i):
-        if self.purpose == Purpose.CLASSIFICATION:
+        if self.purpose == Purpose.CLASSIFICATION.value:
             class_name, coord, image_path = self.data_list[i]
 
             image = Image.open(image_path).crop(coord).resize((self.imsize, self.imsize))
@@ -30,7 +30,7 @@ class PascalVOCDataset(Dataset):
                 image = self.transform(image)
             gt = self.label_map[class_name]
 
-        elif self.purpose == Purpose.DETECTION:
+        elif self.purpose == Purpose.DETECTION.value:
             image_path, gt_path = self.data_list[i]
 
             image = Image.open(image_path).resize((self.imsize, self.imsize))
@@ -54,14 +54,14 @@ class PascalVOCDataset(Dataset):
             for i in ids[:-1]:
                 image_path = Path(data_dir) / 'JPEGImages' / f'{i}.jpg'
                 gt_path = Path(data_dir) / 'Annotations' / f'{i}.xml'
-                if self.purpose == Purpose.CLASSIFICATION:
+                if self.purpose == Purpose.CLASSIFICATION.value:
                     root = ET.parse(gt_path).getroot()
                     for obj in root.iter('object'):
                         class_name = obj.find('name').text
                         bbox = obj.find('bndbox')
                         coord = int(bbox.find('xmin').text), int(bbox.find('ymin').text), int(bbox.find('xmax').text), int(bbox.find('ymax').text)
                         data_list.append([class_name, coord, image_path])
-                elif self.purpose == Purpose.DETECTION:
+                elif self.purpose == Purpose.DETECTION.value:
                     data_list.append([image_path, gt_path])
 
         return data_list
