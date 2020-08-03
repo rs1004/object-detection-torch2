@@ -5,9 +5,10 @@ from pathlib import Path
 
 
 class VGG16(nn.Module):
-    def __init__(self, weights_path=None):
+    def __init__(self, weights_path=None, num_classes=20, transfer_learning=False):
         # initialize
         super(VGG16, self).__init__()
+        self.transfer_learning = transfer_learning
 
         # feature extraction layer
         layers = []
@@ -39,6 +40,21 @@ class VGG16(nn.Module):
             nn.Linear(4096, 1000)
         )
 
+        # classification layer2 (for transfer learning)
+        self.classifier2 = nn.Sequential(
+            nn.Linear(512 * 7 * 7, 4096),
+            nn.ReLU(inplace=True),
+            nn.Dropout(),
+            nn.Linear(4096, 4096),
+            nn.ReLU(inplace=True),
+            nn.Dropout(),
+            nn.Linear(4096, num_classes)
+        )
+        if self.transfer_learning:
+            for m in self.features.modules():
+                for param in m.parameters():
+                    param.requires_grad = False
+
         # load weights
         if weights_path and weights_path.exists():
             print('weights loaded.')
@@ -46,11 +62,21 @@ class VGG16(nn.Module):
         else:
             vgg16_bn = torch.hub.load('pytorch/vision:v0.6.0', 'vgg16_bn', pretrained=True)
             self.load_state_dict(vgg16_bn.state_dict())
+            self._initialize_weights()
+
+    def _initialize_weights(self):
+        for m in self.classifier2.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, 0, 0.01)
+                nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
         x = self.features(x)
         x = x.view(x.size(0), -1)
-        x = self.classifier(x)
+        if self.transfer_learning:
+            x = self.classifier2(x)
+        else:
+            x = self.classifier(x)
         return x
 
     def loss(self, outputs, targets):
@@ -60,7 +86,7 @@ class VGG16(nn.Module):
 
 
 class SSD(nn.Module):
-    def __init__(self, num_classes, weights_path=None):
+    def __init__(self, num_classes, weights_path=None, weights_path_vgg16=None):
         # initialize
         super(SSD, self).__init__()
         self.num_classes = num_classes
@@ -69,7 +95,7 @@ class SSD(nn.Module):
         features = nn.ModuleDict()
 
         # vgg16 layer
-        vgg16 = VGG16()
+        vgg16 = VGG16(weights_path=weights_path_vgg16)
         num_table = {}
         name_map = {'Conv2d': 'conv', 'BatchNorm2d': 'bn', 'ReLU': 'act', 'MaxPool2d': 'pool'}
         layer_num = 1
@@ -316,8 +342,8 @@ class SSD(nn.Module):
         """calculate softmax cross-entropy
 
         Args:
-            pr (torch.Tensor): (B, P, class_num) -> (B, P, 1, class_num)
-            gt (torch.Tensor): (B, G, class_num) -> (B, 1, G, class_num)
+            pr (torch.Tensor): (B, P, num_classes) -> (B, P, 1, num_classes)
+            gt (torch.Tensor): (B, G, num_classes) -> (B, 1, G, num_classes)
 
         Returns:
             torch.Tensor: softmax cross-entropy

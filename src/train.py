@@ -26,7 +26,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--purpose', type=str, default='detection')
     parser.add_argument('--imsize', type=int, default=300)
-    parser.add_argument('--class_num', type=int, default=21)
     parser.add_argument('--batch_size', type=int, default=4)
     parser.add_argument('--epochs', type=int, default=1)
     parser.add_argument('--lr', type=float, default=0.0001)
@@ -61,14 +60,15 @@ if __name__ == '__main__':
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     if args.purpose == Purpose.CLASSIFICATION:
         net = VGG16(
-            num_classes=args.class_num,
-            weights_path=weights_path,
+            num_classes=dataset.num_classes,
+            weights_path=weights_path
         )
         loss_args = {}
     elif args.purpose == Purpose.DETECTION:
         net = SSD(
-            num_classes=args.class_num,
+            num_classes=dataset.num_classes + 1, # add void
             weights_path=weights_path,
+            weights_path_vgg16=Path(args.result_dir) / ' train' / 'classification' / args.weights
         )
         defaults = net.default_bboxes.to(device)
         loss_args = {'default_bboxes': defaults}

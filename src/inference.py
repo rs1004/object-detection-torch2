@@ -35,7 +35,7 @@ def calc_bbox_locs(pr: torch.Tensor, df: torch.Tensor, imsize: int) -> torch.Ten
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--imsize', type=int, default=300)
-    parser.add_argument('--class_num', type=int, default=21)
+    parser.add_argument('--num_classes', type=int, default=21)
     parser.add_argument('--batch_size', type=int, default=4)
     parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--result_dir', type=str, default='./result')
@@ -63,11 +63,11 @@ if __name__ == '__main__':
         collate_fn=collate_fn)
 
     net = SSD(
-        num_classes=args.class_num,
+        num_classes=args.num_classes,
         weights_path=weights_path,
     )
 
-    current_palette = sns.color_palette('hls', n_colors=args.class_num)
+    current_palette = sns.color_palette('hls', n_colors=args.num_classes)
     with open(Path(__file__).parent / 'labelmap.json', 'r') as f:
         labelmap = json.load(f)['PascalVOC']
 

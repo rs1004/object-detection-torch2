@@ -16,6 +16,7 @@ class PascalVOCDataset(Dataset):
         self.imsize = imsize
         self.data_list = self._get_list(data_dirs, data_list_file_name)
         self.label_map = self._get_label_map()
+        self.num_classes = len(self.label_map)
 
     def __len__(self):
         return len(self.data_list)
@@ -73,16 +74,16 @@ class PascalVOCDataset(Dataset):
         return label_map
 
     def _get_gt(self, gt_path):
-        class_num = len(self.label_map) + 1
+        num_classes = self.num_classes + 1
 
         root = ET.parse(gt_path).getroot()
-        gt = torch.empty(0, 4 + class_num)
+        gt = torch.empty(0, 4 + num_classes)
         for obj in root.iter('object'):
             bbox = obj.find('bndbox')
             xmin, ymin, xmax, ymax = int(bbox.find('xmin').text), int(bbox.find('ymin').text), int(bbox.find('xmax').text), int(bbox.find('ymax').text)
             offset = torch.Tensor([(xmin + xmax)/2, (ymin + ymax)/2, xmax - xmin, ymax - ymin]) / self.imsize
             label_id = self.label_map[obj.find('name').text]
-            score = torch.eye(class_num)[label_id + 1]
+            score = torch.eye(num_classes)[label_id + 1]
             t = torch.cat([offset, score]).unsqueeze(0)
             gt = torch.cat([gt, t], dim=0)
         return gt
