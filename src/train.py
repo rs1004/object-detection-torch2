@@ -2,6 +2,7 @@ from dataset import PascalVOCDataset, Purpose
 from model import VGG16, SSD
 from pathlib import Path
 from tqdm import tqdm
+from torch.utils.tensorboard import SummaryWriter
 from torch.nn.utils.rnn import pad_sequence
 from torch.optim.lr_scheduler import ExponentialLR
 import torchvision.transforms as transforms
@@ -86,6 +87,7 @@ if __name__ == '__main__':
 
     optimizer = optim.Adam(net.train_params(), lr=lr, weight_decay=args.weight_decay)
     scheduler = ExponentialLR(optimizer, gamma=args.gamma)
+    writer = SummaryWriter(log_dir='./logs')
 
     running_loss = 0.0
     for epoch in range(args.epochs):
@@ -112,6 +114,9 @@ if __name__ == '__main__':
                 running_loss += loss.item()
 
             running_loss /= i
+            writer.add_scalar('loss', running_loss, epoch)
+            writer.add_scalar('lr', scheduler.get_last_lr()[0], epoch)
+
             if (min_loss is None) or (running_loss < min_loss):
                 weights_path.parent.mkdir(parents=True, exist_ok=True)
                 # save weights
@@ -123,3 +128,5 @@ if __name__ == '__main__':
             running_loss = 0.0
 
     print('Finished Training')
+
+    writer.close()
