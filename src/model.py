@@ -353,8 +353,7 @@ class SSD(nn.Module):
         pr = pr.unsqueeze(2)
         gt = gt.unsqueeze(1)
 
-        sm = torch.exp(pr) / torch.exp(pr).sum(dim=3, keepdims=True)
-        return -(gt * torch.log(sm)).sum(dim=3)
+        return -(gt * F.log_softmax(pr, dim=3)).sum(dim=3)
 
     def split_pos_neg(self, pos_num: torch.Tensor, neg_num: torch.Tensor) -> tuple:
         """split pos:neg = 1:3
