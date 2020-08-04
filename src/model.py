@@ -356,7 +356,7 @@ class SSD(nn.Module):
         sm = torch.exp(pr) / torch.exp(pr).sum(dim=3, keepdims=True)
         return -(gt * torch.log(sm)).sum(dim=3)
 
-    def split_pos_neg(self, pos_num: torch.Tensor, neg_num: torch.Tensor) -> tuple:     
+    def split_pos_neg(self, pos_num: torch.Tensor, neg_num: torch.Tensor) -> tuple:
         """split pos:neg = 1:3
 
         Args:
@@ -384,4 +384,4 @@ class SSD(nn.Module):
         if k > 0:
             return torch.kthvalue(tensor, k=len(tensor) - k).values
         else:
-            return max(tensor)
+            return tensor.max()
