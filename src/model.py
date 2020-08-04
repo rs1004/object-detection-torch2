@@ -258,29 +258,30 @@ class SSD(nn.Module):
         # localization loss
         l = outputs[:, :, :4].unsqueeze(2)
         g = self.calc_delta(gt=targets, df=default_bboxes)
-        l_loc = (self.smooth_l1(l - g) * is_match).sum(dim=2)
+        l_loc = (self.smooth_l1(l - g).sum(dim=3) * is_match).sum(dim=2)
 
         # confidence loss
         # positive
         softmax_pos = self.softmax_cross_entropy(pr=outputs[:, :, 4:], gt=targets[:, :, 4:])
-        l_conf = (softmax_pos * is_match).sum(dim=2)
+        l_conf_pos = (softmax_pos * is_match).sum(dim=2)
 
         # negative
         gt_void = torch.eye(C)[0].unsqueeze(0).unsqueeze(1).to(outputs.device)
         softmax_neg = self.softmax_cross_entropy(pr=outputs[:, :, 4:], gt=gt_void)
-        l_conf += (softmax_neg.squeeze() * ((is_match.sum(dim=2) == 0) * (-1)))
+        is_not_match = is_match.sum(dim=2, keepdims=True) == 0
+        l_conf_neg = (softmax_neg * is_not_match).sum(dim=2)
 
         # hard negative mining
         pos_num = (is_match.sum(dim=2) != 0).sum(dim=1)
         neg_num = P - pos_num
         pos_num, neg_num = self.split_pos_neg(pos_num, neg_num)
 
-        valid_mask = torch.stack([self.kthvalue(l_conf[i], k=neg_num[i], mode='min') for i in range(N)]).unsqueeze(1) > l_conf
-        valid_mask += -torch.stack([self.kthvalue(-l_conf[i], k=pos_num[i], mode='max') for i in range(N)]).unsqueeze(1) < l_conf
+        valid_mask = l_conf_pos > torch.stack([self.k_plus_1_th_value(l_conf_pos[i], pos_num[i]) for i in range(N)]).unsqueeze(1)
+        valid_mask += l_conf_neg > torch.stack([self.k_plus_1_th_value(l_conf_neg[i], neg_num[i]) for i in range(N)]).unsqueeze(1)
 
         # calculate loss (if pos_num = 0, then loss = 0)
         pos_num = torch.where(pos_num > 0, 1/pos_num, pos_num).float()
-        loss = (((l_loc + a * l_conf.abs()) * valid_mask).sum(dim=1) * pos_num).mean()
+        loss = (((l_loc + a * (l_conf_pos + l_conf_neg)) * valid_mask).sum(dim=1) * pos_num).mean()
 
         return loss
 
@@ -293,7 +294,7 @@ class SSD(nn.Module):
             threshold (float, optional): threshold of iou. Defaults to 0.5.
 
         Returns:
-            torch.Tensor: matching mask
+            torch.Tensor (N, P, G): matching mask
         """
         gt = gt.unsqueeze(1)
         df = df.unsqueeze(0).unsqueeze(2)
@@ -313,7 +314,7 @@ class SSD(nn.Module):
             df (torch.Tensor): (1, P, 1, 4)
 
         Returns:
-            torch.Tensor: g-hat tensor
+            torch.Tensor (N, P, G, 4): g-hat tensor
         """
         gt = gt.unsqueeze(1)
         df = df.unsqueeze(0).unsqueeze(2)
@@ -334,10 +335,10 @@ class SSD(nn.Module):
             x (torch.Tensor): any tensor
 
         Returns:
-            torch.Tensor: smooth l1
+            torch.Tensor (N, P, G, 4): smooth l1
         """
         mask = x.abs() < 1
-        return (0.5 * x ** 2 * mask + (x.abs() - 0.5) * (~mask)).sum(dim=3)
+        return 0.5 * x ** 2 * mask + (x.abs() - 0.5) * (~mask)
 
     def softmax_cross_entropy(self, pr: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
         """calculate softmax cross-entropy
@@ -347,7 +348,7 @@ class SSD(nn.Module):
             gt (torch.Tensor): (N, G, num_classes) -> (N, 1, G, num_classes)
 
         Returns:
-            torch.Tensor: softmax cross-entropy
+            torch.Tensor (N, P, G): softmax cross-entropy
         """
         pr = pr.unsqueeze(2)
         gt = gt.unsqueeze(1)
@@ -355,7 +356,7 @@ class SSD(nn.Module):
         sm = torch.exp(pr) / torch.exp(pr).sum(dim=3, keepdims=True)
         return -(gt * torch.log(sm)).sum(dim=3)
 
-    def split_pos_neg(self, pos_num: torch.Tensor, neg_num: torch.Tensor) -> torch.Tensor:
+    def split_pos_neg(self, pos_num: torch.Tensor, neg_num: torch.Tensor) -> tuple:     
         """split pos:neg = 1:3
 
         Args:
@@ -363,26 +364,24 @@ class SSD(nn.Module):
             neg_num (torch.Tensor): (N)
 
         Returns:
-            torch.Tensor: (N)
+            tuple: (pos_num, neg_num)
         """
         cond = pos_num * 3 > neg_num
         return torch.where(cond, neg_num // 3, pos_num), torch.where(cond, neg_num, pos_num * 3)
 
-    def kthvalue(self, tensor: torch.Tensor, k: torch.Tensor, mode: str) -> torch.Tensor:
-        """get kthvalue from tensor
+    def k_plus_1_th_value(self, tensor: torch.Tensor, k: torch.Tensor) -> torch.Tensor:
+        """get (k+1)-th largest value from tensor
 
         Args:
             tensor (torch.Tensor): (P)
             k (torch.Tensor): (1)
-            mode (str): 'min' or 'max'
 
         Returns:
-            torch.Tensor: kth value
+            torch.Tensor (1): 
+                * k > 0: (k+1)-th largest value
+                * k = 0: max value
         """
         if k > 0:
-            return torch.kthvalue(tensor, k=k).values
+            return torch.kthvalue(tensor, k=len(tensor) - k).values
         else:
-            if mode == 'min':
-                return torch.kthvalue(tensor, k=1).values - 1
-            elif mode == 'max':
-                return torch.kthvalue(tensor, k=1).values + 1
+            return max(tensor)
