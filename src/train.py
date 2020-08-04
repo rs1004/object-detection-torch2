@@ -109,7 +109,6 @@ if __name__ == '__main__':
                 loss = net.loss(**loss_args)
                 loss.backward()
                 optimizer.step()
-                scheduler.step()
 
                 running_loss += loss.item()
 
@@ -125,7 +124,9 @@ if __name__ == '__main__':
                 params = {'min_loss': running_loss, 'lr': scheduler.get_last_lr()[0]}
                 with open(params_path, 'w') as f:
                     json.dump(params, f, indent=4)
+
             running_loss = 0.0
+            scheduler.step()
 
     print('Finished Training')
 
