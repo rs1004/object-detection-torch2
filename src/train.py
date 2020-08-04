@@ -90,6 +90,7 @@ if __name__ == '__main__':
     writer = SummaryWriter(log_dir='./logs')
 
     running_loss = 0.0
+    torch.autograd.set_detect_anomaly(True)
     for epoch in range(args.epochs):
         with tqdm(dataloader, total=len(dataloader)) as pbar:
             for i, (images, gts) in enumerate(pbar, start=1):
