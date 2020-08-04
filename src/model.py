@@ -164,7 +164,7 @@ class SSD(nn.Module):
         for name, layer in self.features.items():
             x = layer(x)
             if name in self.classifier:
-                y_ = self.classifier[name](x).permute(0, 2, 3, 1).reshape(batch_size, -1, self.num_classes + 4)
+                y_ = self.classifier[name](x).permute(0, 3, 2, 1).reshape(batch_size, -1, self.num_classes + 4)
                 y = torch.cat([y, y_], dim=1)
 
         return y
@@ -239,8 +239,8 @@ class SSD(nn.Module):
         """calculate loss
 
         Args:
-            outputs (torch.Tensor)   : (B, P, 4 + C)
-            targets (torch.Tensor)     : (B. G. 4 + C)
+            outputs (torch.Tensor)   : (N, P, 4 + C)
+            targets (torch.Tensor)     : (N, G, 4 + C)
             default_bboxes (torch.Tensor): (P, 4)
             a (int, optional): weight term of loss formula. Defaults to 1.
 
@@ -248,7 +248,7 @@ class SSD(nn.Module):
             torch.Tensor: loss
         """
         # constant definition
-        B = outputs.shape[0]
+        N = outputs.shape[0]
         P = outputs.shape[1]
         C = outputs.shape[2] - 4
 
@@ -275,8 +275,8 @@ class SSD(nn.Module):
         neg_num = P - pos_num
         pos_num, neg_num = self.split_pos_neg(pos_num, neg_num)
 
-        valid_mask = torch.stack([self.kthvalue(l_conf[i], k=neg_num[i], mode='min') for i in range(B)]).unsqueeze(1) > l_conf
-        valid_mask += -torch.stack([self.kthvalue(-l_conf[i], k=pos_num[i], mode='max') for i in range(B)]).unsqueeze(1) < l_conf
+        valid_mask = torch.stack([self.kthvalue(l_conf[i], k=neg_num[i], mode='min') for i in range(N)]).unsqueeze(1) > l_conf
+        valid_mask += -torch.stack([self.kthvalue(-l_conf[i], k=pos_num[i], mode='max') for i in range(N)]).unsqueeze(1) < l_conf
 
         # calculate loss (if pos_num = 0, then loss = 0)
         pos_num = torch.where(pos_num > 0, 1/pos_num, pos_num).float()
@@ -288,7 +288,7 @@ class SSD(nn.Module):
         """adapt matching strategy
 
         Args:
-            gt (torch.Tensor): (B, G, 4) -> (B, 1, G, 4)
+            gt (torch.Tensor): (N, G, 4) -> (N, 1, G, 4)
             df (torch.Tensor): (P, 4) -> (1, P, 1, 4)
             threshold (float, optional): threshold of iou. Defaults to 0.5.
 
@@ -309,7 +309,7 @@ class SSD(nn.Module):
         """calculate g-hat
 
         Args:
-            gt (torch.Tensor): (B, G, 4) -> (B, 1, G, 4)
+            gt (torch.Tensor): (N, G, 4) -> (N, 1, G, 4)
             df (torch.Tensor): (1, P, 1, 4)
 
         Returns:
@@ -343,8 +343,8 @@ class SSD(nn.Module):
         """calculate softmax cross-entropy
 
         Args:
-            pr (torch.Tensor): (B, P, num_classes) -> (B, P, 1, num_classes)
-            gt (torch.Tensor): (B, G, num_classes) -> (B, 1, G, num_classes)
+            pr (torch.Tensor): (N, P, num_classes) -> (N, P, 1, num_classes)
+            gt (torch.Tensor): (N, G, num_classes) -> (N, 1, G, num_classes)
 
         Returns:
             torch.Tensor: softmax cross-entropy
@@ -359,11 +359,11 @@ class SSD(nn.Module):
         """split pos:neg = 1:3
 
         Args:
-            pos_num (torch.Tensor): (B)
-            neg_num (torch.Tensor): (B)
+            pos_num (torch.Tensor): (N)
+            neg_num (torch.Tensor): (N)
 
         Returns:
-            torch.Tensor: (B)
+            torch.Tensor: (N)
         """
         cond = pos_num * 3 > neg_num
         return torch.where(cond, neg_num // 3, pos_num), torch.where(cond, neg_num, pos_num * 3)
