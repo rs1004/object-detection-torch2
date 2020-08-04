@@ -323,7 +323,7 @@ class SSD(nn.Module):
         g_cx = (g_cx - d_cx) / d_w
         g_cy = (g_cy - d_cy) / d_h
         g_w = torch.where(g_w > 0, torch.log(g_w / d_w), g_w)
-        g_h = torch.where(g_w > 0, torch.log(g_w / d_w), g_w)
+        g_h = torch.where(g_h > 0, torch.log(g_h / d_h), g_h)
 
         return torch.stack([g_cx, g_cy, g_w, g_h], dim=3)
 
