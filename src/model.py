@@ -276,12 +276,12 @@ class SSD(nn.Module):
         neg_num = P - pos_num
         pos_num, neg_num = self.split_pos_neg(pos_num, neg_num)
 
-        valid_mask = l_conf_pos > torch.stack([self.k_plus_1_th_value(l_conf_pos[i], pos_num[i]) for i in range(N)]).unsqueeze(1)
-        valid_mask += l_conf_neg > torch.stack([self.k_plus_1_th_value(l_conf_neg[i], neg_num[i]) for i in range(N)]).unsqueeze(1)
+        pos_valid = l_conf_pos > torch.stack([self.k_plus_1_th_value(l_conf_pos[i], pos_num[i]) for i in range(N)]).unsqueeze(1)
+        neg_valid = l_conf_neg > torch.stack([self.k_plus_1_th_value(l_conf_neg[i], neg_num[i]) for i in range(N)]).unsqueeze(1)
 
         # calculate loss (if pos_num = 0, then loss = 0)
         pos_num = torch.where(pos_num > 0, 1/pos_num, pos_num).float()
-        loss = (((l_loc + a * (l_conf_pos + l_conf_neg)) * valid_mask).sum(dim=1) * pos_num).mean()
+        loss = (((l_loc + a * l_conf_pos) * pos_valid + a * l_conf_neg * neg_valid).sum(dim=1) * pos_num).mean()
 
         return loss
 
