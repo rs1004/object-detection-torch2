@@ -2,11 +2,32 @@
 
 object detection by SSD with pytorch
 
-## 概要
+# 目次
+
+1. [概要](#anchor1)
+1. [推論結果・評価結果](#anchor2)
+1. [使用するデータセット](#anchor3)
+1. [モデルアーキテクチャ](#anchor4)
+1. [デフォルトBBOX作成手順](#anchor5)
+1. [損失関数](#anchor6)
+1. [スクリプト構成](#anchor7)
+1. [処理実施手順](#anchor8)
+
+<a id="anchor1"></a>
+
+# 概要
 
 物体検出モデル及び一連のスクリプトを `pytorch` をベースにして作成する。
 
-## 使用するデータセット
+<a id="anchor2"></a>
+
+# 推論結果・評価結果
+
+準備中
+
+<a id="anchor3"></a>
+
+# 使用するデータセット
 
 PASCAL VOC (Visual Object Classes) 2007, 2012を使用。
 
@@ -25,11 +46,27 @@ PASCAL VOC (Visual Object Classes) 2007, 2012を使用。
 
 * data/VOCdevkit/VOC2007/ImageSets/Main/test.txt
 
-## 推論結果・評価結果
+<a id="anchor4"></a>
+
+# モデルアーキテクチャ
 
 準備中
 
-## スクリプト構成
+<a id="anchor5"></a>
+
+# デフォルトBBOX作成手順
+
+準備中
+
+<a id="anchor6"></a>
+
+# 損失関数
+
+準備中
+
+<a id="anchor7"></a>
+
+# スクリプト構成
 
 ``` 
 src
@@ -41,14 +78,17 @@ src
 └train.py       ・・・学習用のスクリプト
 ```
 
-## 処理実施手順
+<a id="anchor8"></a>
 
-### 1. 環境構築
+# 処理実施手順
+
+## 1. 環境構築
+
 本スクリプトはEC2(p2.xlarge)での実施を想定している。
 
-インスタンス起動後、[ここ](https://github.com/rs1004/semantic-segmentation-tf2/blob/master/setup.md)を参考に GPU 設定、Docker 設定を行う。
+インスタンス起動後、[ここ](https://github.com/rs1004/tips/blob/master/setup/set_gpu_and_docker.md)を参考に GPU 設定、Docker 設定を行う。
 
-### 2. Docker ビルド・起動
+## 2. Docker ビルド・起動
 
 以下でDockerをビルド・起動する。
 
@@ -57,7 +97,7 @@ docker build -t gpu_env --rm=true docker/
 docker run --shm-size=20g --gpus all -it --rm -v /work/object-detection-torch/:/work --name od gpu_env
 ```
 
-### 3. 学習実行
+## 3. 学習実行
 
 学習は `train.py` で行う。以下実行時のパラメータを記載。
 
