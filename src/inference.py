@@ -12,6 +12,16 @@ import json
 
 
 def calc_bbox_locs(pr: torch.Tensor, df: torch.Tensor, imsize: int) -> torch.Tensor:
+    """calculate bbox location
+
+    Args:
+        pr (torch.Tensor): (N, P, 4)
+        df (torch.Tensor): (P, 4) -> (1, P, 4)
+        imsize (int): image size
+
+    Returns:
+        torch.Tensor (N, P, 4): location coordinate
+    """    
     df = df.unsqueeze(0)
 
     p_cx, p_cy, p_w, p_h = [pr[:, :, i] for i in range(4)]
@@ -35,24 +45,23 @@ def calc_bbox_locs(pr: torch.Tensor, df: torch.Tensor, imsize: int) -> torch.Ten
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--imsize', type=int, default=300)
-    parser.add_argument('--num_classes', type=int, default=21)
     parser.add_argument('--batch_size', type=int, default=4)
     parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--result_dir', type=str, default='./result')
     parser.add_argument('--weights', type=str, default='weights.pth')
     args = parser.parse_args()
 
-    weights_path = Path(args.result_dir) / 'train' / args.weights
-    out_dir = Path(args.result_dir) / 'inference'
+    weights_path = Path(args.result_dir) / 'train' / 'detection' / args.weights
+    out_dir = Path(args.result_dir) / 'inference' / 'detection'
     out_dir.mkdir(parents=True, exist_ok=True)
 
     transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+        transforms.ToTensor()])
 
     dataset = PascalVOCDataset(
+        purpose='detection',
         data_dirs='/work/data/VOCdevkit/VOC2007',
-        data_list_file_name='test.txt',
+        data_list_file_name='trainval.txt',
         imsize=args.imsize,
         transform=transform)
 
@@ -62,18 +71,18 @@ if __name__ == '__main__':
         num_workers=args.num_workers,
         collate_fn=collate_fn)
 
-    net = SSD(
-        num_classes=args.num_classes,
-        weights_path=weights_path,
-    )
-
-    current_palette = sns.color_palette('hls', n_colors=args.num_classes)
-    with open(Path(__file__).parent / 'labelmap.json', 'r') as f:
-        labelmap = json.load(f)['PascalVOC']
-
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    net = SSD(
+        num_classes=dataset.num_classes + 1,
+        weights_path=weights_path,
+        weights_path_vgg16=Path(args.result_dir) / 'train' / 'classification' / args.weights
+    )
     net.to(device)
     defaults = net.default_bboxes.to(device)
+
+    current_palette = sns.color_palette('hls', n_colors=dataset.num_classes + 1)
+    with open(Path(__file__).parent / 'labelmap.json', 'r') as f:
+        labelmap = json.load(f)['PascalVOC']
 
     n = 1
     with torch.no_grad():
