@@ -132,8 +132,8 @@ class SSD(nn.Module):
             else:
                 k, v, s, p = c
                 features[f'conv_{layer_num}_{sub_num}'] = nn.Conv2d(in_channels=in_channels, out_channels=v, kernel_size=k, stride=s, padding=p)
-                features[f'bn_{layer_num}_{sub_num}'] = nn.BatchNorm2d(v)
-                features[f'act_{layer_num}_{sub_num}'] = nn.ReLU(inplace=True)
+                # features[f'bn_{layer_num}_{sub_num}'] = nn.BatchNorm2d(v)
+                # features[f'act_{layer_num}_{sub_num}'] = nn.ReLU(inplace=True)
 
                 sub_num += 1
                 in_channels = v
@@ -141,12 +141,12 @@ class SSD(nn.Module):
         self.features = features
 
         self.classifier = nn.ModuleDict({
-            'act_4_3': nn.Conv2d(in_channels=512, out_channels=4*(num_classes+4), kernel_size=3, padding=1),
-            'act_7_1': nn.Conv2d(in_channels=1024, out_channels=6*(num_classes+4), kernel_size=3, padding=1),
-            'act_8_2': nn.Conv2d(in_channels=512, out_channels=6*(num_classes+4), kernel_size=3, padding=1),
-            'act_9_2': nn.Conv2d(in_channels=256, out_channels=6*(num_classes+4), kernel_size=3, padding=1),
-            'act_10_2': nn.Conv2d(in_channels=256, out_channels=4*(num_classes+4), kernel_size=3, padding=1),
-            'act_11_2': nn.Conv2d(in_channels=256, out_channels=4*(num_classes+4), kernel_size=3, padding=1),
+            'conv_4_3': nn.Conv2d(in_channels=512, out_channels=4*(num_classes+4), kernel_size=3, padding=1),
+            'conv_7_1': nn.Conv2d(in_channels=1024, out_channels=6*(num_classes+4), kernel_size=3, padding=1),
+            'conv_8_2': nn.Conv2d(in_channels=512, out_channels=6*(num_classes+4), kernel_size=3, padding=1),
+            'conv_9_2': nn.Conv2d(in_channels=256, out_channels=6*(num_classes+4), kernel_size=3, padding=1),
+            'conv_10_2': nn.Conv2d(in_channels=256, out_channels=4*(num_classes+4), kernel_size=3, padding=1),
+            'conv_11_2': nn.Conv2d(in_channels=256, out_channels=4*(num_classes+4), kernel_size=3, padding=1),
         })
 
         # load weights
@@ -285,13 +285,13 @@ class SSD(nn.Module):
 
         return loss
 
-    def match(self, gt: torch.Tensor, df: torch.Tensor, threshold: float = 0.5) -> torch.Tensor:
+    def match(self, gt: torch.Tensor, df: torch.Tensor, threshold: float = 0.3) -> torch.Tensor:
         """adapt matching strategy
 
         Args:
             gt (torch.Tensor): (N, G, 4) -> (N, 1, G, 4)
             df (torch.Tensor): (P, 4) -> (1, P, 1, 4)
-            threshold (float, optional): threshold of iou. Defaults to 0.5.
+            threshold (float, optional): threshold of iou. Defaults to 0.3.
 
         Returns:
             torch.Tensor (N, P, G): matching mask
