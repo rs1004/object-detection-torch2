@@ -7,6 +7,7 @@ from PIL import Image, ImageDraw
 import seaborn as sns
 import torchvision.transforms as transforms
 import torch
+import torch.nn.functional as F
 import argparse
 import json
 
@@ -103,7 +104,7 @@ if __name__ == '__main__':
                     image = Image.fromarray((images[i].permute(1, 2, 0).cpu().numpy() * 255).astype('uint8'))
                     draw = ImageDraw.Draw(image)
                     locs = bbox_locs[i].cpu()
-                    labels = torch.max(bbox_confs[i].cpu(), dim=1)
+                    labels = torch.max(F.softmax(bbox_confs[i], dim=1).cpu(), dim=1)
                     for loc, class_id, score in zip(locs, labels.indices, labels.values):
                         # case: void or noise
                         if (class_id == 0) or (score < 0.5):
