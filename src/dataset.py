@@ -78,13 +78,16 @@ class PascalVOCDataset(Dataset):
 
         root = ET.parse(gt_path).getroot()
         gt = torch.empty(0, 4 + num_classes)
+        for size in root.iter('size'):
+            width = int(size.find('width').text)
+            height = int(size.find('height').text)
         for obj in root.iter('object'):
             bbox = obj.find('bndbox')
             xmin, ymin, xmax, ymax = int(bbox.find('xmin').text), int(bbox.find('ymin').text), int(bbox.find('xmax').text), int(bbox.find('ymax').text)
-            offset = torch.Tensor([(xmin + xmax)/2, (ymin + ymax)/2, xmax - xmin, ymax - ymin]) / self.imsize
+            coord = torch.Tensor([(xmin + xmax)/2/width, (ymin + ymax)/2/height, (xmax - xmin)/width, (ymax - ymin)/height])
             label_id = self.label_map[obj.find('name').text]
             score = torch.eye(num_classes)[label_id + 1]
-            t = torch.cat([offset, score]).unsqueeze(0)
+            t = torch.cat([coord, score]).unsqueeze(0)
             gt = torch.cat([gt, t], dim=0)
         return gt
 

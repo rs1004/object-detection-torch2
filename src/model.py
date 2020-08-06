@@ -284,13 +284,13 @@ class SSD(nn.Module):
 
         return loss
 
-    def match(self, gt: torch.Tensor, df: torch.Tensor, threshold: float = 0.3) -> torch.Tensor:
+    def match(self, gt: torch.Tensor, df: torch.Tensor, threshold: float = 0.5) -> torch.Tensor:
         """adapt matching strategy
 
         Args:
             gt (torch.Tensor): (N, G, 4) -> (N, 1, G, 4)
             df (torch.Tensor): (P, 4) -> (1, P, 1, 4)
-            threshold (float, optional): threshold of iou. Defaults to 0.3.
+            threshold (float, optional): threshold of iou. Defaults to 0.5.
 
         Returns:
             torch.Tensor (N, P, G): matching mask
@@ -303,7 +303,7 @@ class SSD(nn.Module):
         w = (torch.min(g_cx + g_w/2, d_cx + d_w/2) - torch.max(g_cx - g_w/2, d_cx - d_w/2)).clamp(min=0)
         h = (torch.min(g_cy + g_h/2, d_cy + d_h/2) - torch.max(g_cy - g_h/2, d_cy - d_h/2)).clamp(min=0)
 
-        return (w * h / (g_w * g_h + d_w * d_h - w * h)) > threshold
+        return torch.where(g_w * g_h > 0, w * h / (g_w * g_h + d_w * d_h - w * h), g_w * g_h) > threshold
 
     def calc_delta(self, gt: torch.Tensor, df: torch.Tensor) -> torch.Tensor:
         """calculate g-hat
