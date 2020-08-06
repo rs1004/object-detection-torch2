@@ -176,7 +176,7 @@ class SSD(nn.Module):
         cfg = [[38, 38, 4], [19, 19, 6], [10, 10, 6], [5, 5, 6], [3, 3, 4], [1, 1, 4]]
 
         for k, (m, n, l) in enumerate(cfg, start=1):
-            aspects = [1, 2, 1/2, 'add'] if l == 4 else [1, 2, 3, 1/2, 1/3, 'add']
+            aspects = [1, 2, 1/2, 'add'] if l == 4 else [1, 2, 1/2, 3, 1/3, 'add']
             for i in range(m):
                 for j in range(n):
                     for a in aspects:
