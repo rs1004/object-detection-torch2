@@ -163,7 +163,7 @@ class SSD(nn.Module):
         for name, layer in self.features.items():
             x = layer(x)
             if name in self.classifier:
-                y_ = self.classifier[name](x).permute(0, 3, 2, 1).reshape(batch_size, -1, self.num_classes + 4)
+                y_ = self.classifier[name](x).permute(0, 2, 3, 1).reshape(batch_size, -1, self.num_classes + 4)
                 y = torch.cat([y, y_], dim=1)
 
         return y
@@ -185,7 +185,7 @@ class SSD(nn.Module):
                         else:
                             w = s_(k) * (a ** 0.5)
                             h = s_(k) * ((1/a) ** 0.5)
-                        new_bbox = torch.Tensor([[(j + 0.5) / n, (i + 0.5) / m, w, h]])
+                        new_bbox = torch.Tensor([[(i + 0.5) / m, (j + 0.5) / n, w, h]])
                         default_bboxes = torch.cat([default_bboxes, new_bbox])
 
         return default_bboxes
