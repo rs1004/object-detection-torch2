@@ -279,8 +279,8 @@ class SSD(nn.Module):
         neg_valid = l_conf_neg > torch.stack([self.k_plus_1_th_value(l_conf_neg[i], neg_num[i]) for i in range(N)]).unsqueeze(1)
 
         # calculate loss (if pos_num = 0, then loss = 0)
-        pos_num = torch.where(pos_num > 0, 1/pos_num, pos_num).float()
-        loss = (((l_loc + a * l_conf_pos) * pos_valid + a * l_conf_neg * neg_valid).sum(dim=1) * pos_num).mean()
+        pos_num = torch.where(pos_num > 0, 1/pos_num.float(), pos_num.float())
+        loss = (((a * l_loc + l_conf_pos) * pos_valid + l_conf_neg * neg_valid).sum(dim=1) * pos_num).mean()
 
         return loss
 
@@ -336,8 +336,7 @@ class SSD(nn.Module):
         Returns:
             torch.Tensor (N, P, G, 4): smooth l1
         """
-        mask = x.abs() < 1
-        return 0.5 * x ** 2 * mask + (x.abs() - 0.5) * (~mask)
+        return torch.where(x.abs() < 1, 0.5 * x * x, x.abs() - 0.5)
 
     def softmax_cross_entropy(self, pr: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
         """calculate softmax cross-entropy
