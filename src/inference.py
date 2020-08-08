@@ -52,8 +52,8 @@ if __name__ == '__main__':
     parser.add_argument('--weights', type=str, default='weights.pth')
     args = parser.parse_args()
 
-    weights_path = Path(args.result_dir) / 'train' / 'detection' / args.weights
-    out_dir = Path(args.result_dir) / 'inference' / 'detection'
+    weights_path = Path(args.result_dir) / 'detection' / args.weights
+    out_dir = Path(args.result_dir) / 'detection'
     out_dir.mkdir(parents=True, exist_ok=True)
 
     transform = transforms.Compose([
@@ -77,7 +77,7 @@ if __name__ == '__main__':
     net = SSD(
         num_classes=dataset.num_classes + 1,
         weights_path=weights_path,
-        weights_path_vgg16=Path(args.result_dir) / 'train' / 'classification' / args.weights
+        weights_path_vgg16=Path(args.result_dir) / 'classification' / args.weights
     )
     net.to(device)
     defaults = net.default_bboxes.to(device)

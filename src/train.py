@@ -38,8 +38,8 @@ if __name__ == '__main__':
     parser.add_argument('--params', type=str, default='params.json')
     args = parser.parse_args()
 
-    weights_path = Path(args.result_dir) / 'train' / args.purpose / args.weights
-    params_path = Path(args.result_dir) / 'train' / args.purpose / args.params
+    weights_path = Path(args.result_dir) / args.purpose / args.weights
+    params_path = Path(args.result_dir) / args.purpose / args.params
 
     transform = transforms.Compose([
         transforms.ToTensor(),
@@ -70,7 +70,7 @@ if __name__ == '__main__':
         net = SSD(
             num_classes=dataset.num_classes + 1,  # add void
             weights_path=weights_path,
-            weights_path_vgg16=Path(args.result_dir) / 'train' / 'classification' / args.weights
+            weights_path_vgg16=Path(args.result_dir) / 'classification' / args.weights
         )
         defaults = net.default_bboxes.to(device)
         loss_args = {'default_bboxes': defaults}
