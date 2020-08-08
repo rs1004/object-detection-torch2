@@ -179,12 +179,12 @@ class SSD(nn.Module):
             aspects = [1, 2, 1 / 2, 'add'] if a_num == 4 else [1, 2, 1 / 2, 3, 1 / 3, 'add']
             for i in range(m):
                 for j in range(n):
-                    for aspect in aspects:
-                        if aspect == 'add':
+                    for a in aspects:
+                        if a == 'add':
                             w = h = (s_(k) * s_(k + 1)) ** 0.5
                         else:
-                            w = s_(k) * (aspect ** 0.5)
-                            h = s_(k) * ((1 / aspect) ** 0.5)
+                            w = s_(k) * (a ** 0.5)
+                            h = s_(k) * ((1 / a) ** 0.5)
                         new_bbox = torch.Tensor([[(i + 0.5) / m, (j + 0.5) / n, w, h]])
                         default_bboxes = torch.cat([default_bboxes, new_bbox])
 
