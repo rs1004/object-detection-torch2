@@ -14,7 +14,7 @@ class PascalVOCDataset(Dataset):
         if self.purpose not in Purpose.show_all():
             raise ValueError(f'purpose "{self.purpose}" is isvalid')
         self.imsize = imsize
-        self.data_list = self._get_list(data_dirs, data_list_file_name)
+        self.data_list = self._get_list(data_dirs, data_list_file_name)[:20]
         self.label_map = self._get_label_map()
         self.num_classes = len(self.label_map)
 
@@ -84,7 +84,7 @@ class PascalVOCDataset(Dataset):
         for obj in root.iter('object'):
             bbox = obj.find('bndbox')
             xmin, ymin, xmax, ymax = int(bbox.find('xmin').text), int(bbox.find('ymin').text), int(bbox.find('xmax').text), int(bbox.find('ymax').text)
-            coord = torch.Tensor([(xmin + xmax)/2/width, (ymin + ymax)/2/height, (xmax - xmin)/width, (ymax - ymin)/height])
+            coord = torch.Tensor([(xmin + xmax) / 2 / width, (ymin + ymax) / 2 / height, (xmax - xmin) / width, (ymax - ymin) / height])
             label_id = self.label_map[obj.find('name').text]
             score = torch.eye(num_classes)[label_id + 1]
             t = torch.cat([coord, score]).unsqueeze(0)

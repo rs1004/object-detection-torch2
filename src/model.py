@@ -140,12 +140,12 @@ class SSD(nn.Module):
         self.features = features
 
         self.classifier = nn.ModuleDict({
-            'act_4_3': nn.Conv2d(in_channels=512, out_channels=4*(num_classes+4), kernel_size=3, padding=1),
-            'act_7_1': nn.Conv2d(in_channels=1024, out_channels=6*(num_classes+4), kernel_size=3, padding=1),
-            'act_8_2': nn.Conv2d(in_channels=512, out_channels=6*(num_classes+4), kernel_size=3, padding=1),
-            'act_9_2': nn.Conv2d(in_channels=256, out_channels=6*(num_classes+4), kernel_size=3, padding=1),
-            'act_10_2': nn.Conv2d(in_channels=256, out_channels=4*(num_classes+4), kernel_size=3, padding=1),
-            'act_11_2': nn.Conv2d(in_channels=256, out_channels=4*(num_classes+4), kernel_size=3, padding=1),
+            'act_4_3': nn.Conv2d(in_channels=512, out_channels=4 * (num_classes + 4), kernel_size=3, padding=1),
+            'act_7_1': nn.Conv2d(in_channels=1024, out_channels=6 * (num_classes + 4), kernel_size=3, padding=1),
+            'act_8_2': nn.Conv2d(in_channels=512, out_channels=6 * (num_classes + 4), kernel_size=3, padding=1),
+            'act_9_2': nn.Conv2d(in_channels=256, out_channels=6 * (num_classes + 4), kernel_size=3, padding=1),
+            'act_10_2': nn.Conv2d(in_channels=256, out_channels=4 * (num_classes + 4), kernel_size=3, padding=1),
+            'act_11_2': nn.Conv2d(in_channels=256, out_channels=4 * (num_classes + 4), kernel_size=3, padding=1),
         })
 
         # load weights
@@ -175,16 +175,16 @@ class SSD(nn.Module):
         default_bboxes = torch.empty(0, 4)
         cfg = [[38, 38, 4], [19, 19, 6], [10, 10, 6], [5, 5, 6], [3, 3, 4], [1, 1, 4]]
 
-        for k, (m, n, l) in enumerate(cfg, start=1):
-            aspects = [1, 2, 1/2, 'add'] if l == 4 else [1, 2, 1/2, 3, 1/3, 'add']
+        for k, (m, n, a_num) in enumerate(cfg, start=1):
+            aspects = [1, 2, 1 / 2, 'add'] if a_num == 4 else [1, 2, 1 / 2, 3, 1 / 3, 'add']
             for i in range(m):
                 for j in range(n):
-                    for a in aspects:
-                        if a == 'add':
-                            w = h = (s_(k) * s_(k+1)) ** 0.5
+                    for aspect in aspects:
+                        if aspect == 'add':
+                            w = h = (s_(k) * s_(k + 1)) ** 0.5
                         else:
-                            w = s_(k) * (a ** 0.5)
-                            h = s_(k) * ((1/a) ** 0.5)
+                            w = s_(k) * (aspect ** 0.5)
+                            h = s_(k) * ((1 / aspect) ** 0.5)
                         new_bbox = torch.Tensor([[(i + 0.5) / m, (j + 0.5) / n, w, h]])
                         default_bboxes = torch.cat([default_bboxes, new_bbox])
 
@@ -214,7 +214,7 @@ class SSD(nn.Module):
                     nn.init.constant_(m.bias, 0)
 
     def train_params(self) -> None:
-        """generate params to train 
+        """generate params to train
 
         Yields:
             nn.parameter.Parameter: trainable params
@@ -279,7 +279,7 @@ class SSD(nn.Module):
         neg_valid = l_conf_neg > torch.stack([self.k_plus_1_th_value(l_conf_neg[i], neg_num[i]) for i in range(N)]).unsqueeze(1)
 
         # calculate loss (if pos_num = 0, then loss = 0)
-        pos_num = torch.where(pos_num > 0, 1/pos_num.float(), pos_num.float())
+        pos_num = torch.where(pos_num > 0, 1 / pos_num.float(), pos_num.float())
         loss = (((a * l_loc + l_conf_pos) * pos_valid + l_conf_neg * neg_valid).sum(dim=1) * pos_num).mean()
 
         return loss
@@ -300,8 +300,8 @@ class SSD(nn.Module):
 
         g_cx, g_cy, g_w, g_h = [gt[:, :, :, i] for i in range(4)]
         d_cx, d_cy, d_w, d_h = [df[:, :, :, i] for i in range(4)]
-        w = (torch.min(g_cx + g_w/2, d_cx + d_w/2) - torch.max(g_cx - g_w/2, d_cx - d_w/2)).clamp(min=0)
-        h = (torch.min(g_cy + g_h/2, d_cy + d_h/2) - torch.max(g_cy - g_h/2, d_cy - d_h/2)).clamp(min=0)
+        w = (torch.min(g_cx + g_w / 2, d_cx + d_w / 2) - torch.max(g_cx - g_w / 2, d_cx - d_w / 2)).clamp(min=0)
+        h = (torch.min(g_cy + g_h / 2, d_cy + d_h / 2) - torch.max(g_cy - g_h / 2, d_cy - d_h / 2)).clamp(min=0)
 
         return torch.where(g_w * g_h > 0, w * h / (g_w * g_h + d_w * d_h - w * h), g_w * g_h) > threshold
 
@@ -374,7 +374,7 @@ class SSD(nn.Module):
             k (torch.Tensor): (1)
 
         Returns:
-            torch.Tensor (1): 
+            torch.Tensor (1):
                 * k > 0: (k+1)-th largest value
                 * k = 0: max value
         """

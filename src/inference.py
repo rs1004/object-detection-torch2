@@ -22,7 +22,7 @@ def calc_bbox_locs(pr: torch.Tensor, df: torch.Tensor, imsize: int) -> torch.Ten
 
     Returns:
         torch.Tensor (N, P, 4): location coordinate
-    """    
+    """
     df = df.unsqueeze(0)
 
     p_cx, p_cy, p_w, p_h = [pr[:, :, i] for i in range(4)]
@@ -111,7 +111,7 @@ if __name__ == '__main__':
                             continue
 
                         # calc coord
-                        xmin, ymin, xmax, ymax = [l.item() for l in loc]
+                        xmin, ymin, xmax, ymax = [_.item() for _ in loc]
                         left_top = (max(xmin, 0), max(ymin, 0))
                         right_bottom = (min(xmax, args.imsize), min(ymax, args.imsize))
 
