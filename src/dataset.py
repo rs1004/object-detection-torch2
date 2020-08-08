@@ -26,17 +26,17 @@ class PascalVOCDataset(Dataset):
             class_name, coord, image_path = self.data_list[i]
 
             image = Image.open(image_path).crop(coord).resize((self.imsize, self.imsize))
-            if self.transform:
-                image = self.transform(image)
             gt = self.label_map[class_name]
+            if self.transform:
+                image, gt = self.transform(image, gt)
 
         elif self.purpose == Purpose.DETECTION.value:
             image_path, gt_path = self.data_list[i]
 
             image = Image.open(image_path).resize((self.imsize, self.imsize))
-            if self.transform:
-                image = self.transform(image)
             gt = self._get_gt(gt_path)
+            if self.transform:
+                image, gt = self.transform(image, gt)
 
         return image, gt
 

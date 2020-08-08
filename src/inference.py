@@ -1,11 +1,11 @@
 from dataset import PascalVOCDataset
 from model import SSD
+from augmentation import Compose, ToTensor, Normalize
 from train import collate_fn
 from pathlib import Path
 from tqdm import tqdm
 from PIL import Image, ImageDraw
 import seaborn as sns
-import torchvision.transforms as transforms
 import torch
 import torch.nn.functional as F
 import argparse
@@ -56,9 +56,9 @@ if __name__ == '__main__':
     out_dir = Path(args.result_dir) / 'detection'
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+    transform = Compose([
+        ToTensor(),
+        Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
 
     dataset = PascalVOCDataset(
         purpose='detection',

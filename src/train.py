@@ -1,11 +1,11 @@
 from dataset import PascalVOCDataset, Purpose
 from model import VGG16, SSD
+from augmentation import Compose, ToTensor, Normalize
 from pathlib import Path
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 from torch.nn.utils.rnn import pad_sequence
 from torch.optim.lr_scheduler import ExponentialLR
-import torchvision.transforms as transforms
 import torch.optim as optim
 import torch
 import argparse
@@ -41,9 +41,9 @@ if __name__ == '__main__':
     weights_path = Path(args.result_dir) / args.purpose / args.weights
     params_path = Path(args.result_dir) / args.purpose / args.params
 
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+    transform = Compose([
+        ToTensor(),
+        Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
 
     dataset = PascalVOCDataset(
         purpose=args.purpose,
