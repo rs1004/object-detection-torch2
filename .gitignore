@@ -1,7 +1,6 @@
 # data
 data
 data.tar
-*.pth
 result
 logs
 
