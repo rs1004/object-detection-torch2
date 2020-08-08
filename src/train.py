@@ -1,26 +1,14 @@
 from dataset import PascalVOCDataset, Purpose
 from model import VGG16, SSD
 from augmentation import Compose, ToTensor, Normalize
+from utils import collate_fn
 from pathlib import Path
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
-from torch.nn.utils.rnn import pad_sequence
-from torch.optim.lr_scheduler import ExponentialLR
 import torch.optim as optim
 import torch
 import argparse
 import json
-
-
-def collate_fn(batch):
-    images = []
-    gts = []
-    for image, gt in batch:
-        images.append(image)
-        gts.append(gt)
-    images = torch.stack(images, dim=0)
-    gts = pad_sequence(gts, batch_first=True)
-    return images, gts
 
 
 if __name__ == '__main__':
@@ -87,7 +75,7 @@ if __name__ == '__main__':
         lr = args.lr
 
     optimizer = optim.Adam(net.train_params(), lr=lr, weight_decay=args.weight_decay)
-    scheduler = ExponentialLR(optimizer, gamma=args.gamma)
+    scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=args.gamma)
     writer = SummaryWriter(log_dir='./logs')
 
     running_loss = 0.0

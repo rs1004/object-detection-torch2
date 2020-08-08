@@ -1,9 +1,9 @@
+from utils import LabelMap
 from torch.utils.data import Dataset
 from pathlib import Path
 from PIL import Image
 from enum import Enum
 import xml.etree.ElementTree as ET
-import json
 import torch
 
 
@@ -15,8 +15,8 @@ class PascalVOCDataset(Dataset):
             raise ValueError(f'purpose "{self.purpose}" is isvalid')
         self.imsize = imsize
         self.data_list = self._get_list(data_dirs, data_list_file_name)
-        self.label_map = self._get_label_map()
-        self.num_classes = len(self.label_map)
+        self.labelmap = LabelMap('PascalVOC')
+        self.num_classes = len(self.labelmap)
 
     def __len__(self):
         return len(self.data_list)
@@ -26,7 +26,8 @@ class PascalVOCDataset(Dataset):
             class_name, coord, image_path = self.data_list[i]
 
             image = Image.open(image_path).crop(coord).resize((self.imsize, self.imsize))
-            gt = self.label_map[class_name]
+            id = self.labelmap.name2id(class_name)
+            gt = torch.eye(len(self.labelmap))[id]
             if self.transform:
                 image, gt = self.transform(image, gt)
 
@@ -66,15 +67,8 @@ class PascalVOCDataset(Dataset):
 
         return data_list
 
-    def _get_label_map(self):
-        label_map_path = Path(__file__).parent / 'labelmap.json'
-        with open(label_map_path, 'r') as f:
-            labels = json.load(f)['PascalVOC']
-        label_map = {label: i for i, label in enumerate(labels)}
-        return label_map
-
     def _get_gt(self, gt_path):
-        num_classes = self.num_classes + 1
+        num_classes = self.num_classes + 1  # add void
 
         root = ET.parse(gt_path).getroot()
         gt = torch.empty(0, 4 + num_classes)
@@ -85,8 +79,8 @@ class PascalVOCDataset(Dataset):
             bbox = obj.find('bndbox')
             xmin, ymin, xmax, ymax = int(bbox.find('xmin').text), int(bbox.find('ymin').text), int(bbox.find('xmax').text), int(bbox.find('ymax').text)
             coord = torch.Tensor([(xmin + xmax) / 2 / width, (ymin + ymax) / 2 / height, (xmax - xmin) / width, (ymax - ymin) / height])
-            label_id = self.label_map[obj.find('name').text]
-            score = torch.eye(num_classes)[label_id + 1]
+            id = self.labelmap.name2id(obj.find('name').text)
+            score = torch.eye(num_classes)[id + 1]
             t = torch.cat([coord, score]).unsqueeze(0)
             gt = torch.cat([gt, t], dim=0)
         return gt

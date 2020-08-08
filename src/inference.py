@@ -1,7 +1,7 @@
 from dataset import PascalVOCDataset
 from model import SSD
 from augmentation import Compose, ToTensor, Normalize
-from train import collate_fn
+from utils import collate_fn, LabelMap
 from pathlib import Path
 from tqdm import tqdm
 from PIL import Image, ImageDraw
@@ -9,7 +9,6 @@ import seaborn as sns
 import torch
 import torch.nn.functional as F
 import argparse
-import json
 
 
 def calc_bbox_locs(pr: torch.Tensor, df: torch.Tensor, imsize: int) -> torch.Tensor:
@@ -83,8 +82,7 @@ if __name__ == '__main__':
     defaults = net.default_bboxes.to(device)
 
     current_palette = sns.color_palette('hls', n_colors=dataset.num_classes + 1)
-    with open(Path(__file__).parent / 'labelmap.json', 'r') as f:
-        labelmap = json.load(f)['PascalVOC']
+    labelmap = LabelMap('PascalVOC')
 
     n = 1
     with torch.no_grad():
@@ -116,7 +114,7 @@ if __name__ == '__main__':
                         right_bottom = (min(xmax, args.imsize), min(ymax, args.imsize))
 
                         # set text
-                        text = f' {labelmap[class_id.item()-1]} {str(round(score.item(), 3))}'
+                        text = f' {labelmap.id2name(class_id.item()-1)} {str(round(score.item(), 3))}'
                         text_loc = (max(xmin, 0), max(ymin, 0) - 11)
                         text_back_loc = (max(xmin, 0) + len(text) * 6, max(ymin, 0))
 
