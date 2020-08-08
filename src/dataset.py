@@ -14,7 +14,7 @@ class PascalVOCDataset(Dataset):
         if self.purpose not in Purpose.show_all():
             raise ValueError(f'purpose "{self.purpose}" is isvalid')
         self.imsize = imsize
-        self.data_list = self._get_list(data_dirs, data_list_file_name)[:20]
+        self.data_list = self._get_list(data_dirs, data_list_file_name)
         self.label_map = self._get_label_map()
         self.num_classes = len(self.label_map)
 

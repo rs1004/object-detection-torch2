@@ -63,7 +63,7 @@ if __name__ == '__main__':
     dataset = PascalVOCDataset(
         purpose='detection',
         data_dirs='/work/data/VOCdevkit/VOC2007',
-        data_list_file_name='trainval.txt',
+        data_list_file_name='test.txt',
         imsize=args.imsize,
         transform=transform)
 
