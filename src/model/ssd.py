@@ -89,7 +89,12 @@ class SSD(nn.Module):
 
         return y
 
-    def _get_default_bboxes(self):
+    def _get_default_bboxes(self) -> torch.Tensor:
+        """calculate location of default bbox
+
+        Returns:
+            torch.Tensor (P, 4): default bboxes
+        """
         def s_(k, m=6, s_min=0.2, s_max=0.9):
             return s_min + (s_max - s_min) * (k - 1) / (m - 1)
 
@@ -159,9 +164,9 @@ class SSD(nn.Module):
         """calculate loss
 
         Args:
-            outputs (torch.Tensor)   : (N, P, 4 + C)
-            targets (torch.Tensor)     : (N, G, 4 + C)
-            default_bboxes (torch.Tensor): (P, 4)
+            outputs (torch.Tensor)        : (N, P, 4 + C)
+            targets (torch.Tensor)        : (N, G, 4 + C)
+            default_bboxes (torch.Tensor) : (P, 4)
             a (int, optional): weight term of loss formula. Defaults to 1.
 
         Returns:
@@ -173,31 +178,31 @@ class SSD(nn.Module):
         C = outputs.shape[2] - 4
 
         # matching
-        is_match = self.match(gt=targets, df=default_bboxes)
+        is_match = self._match(gt=targets, df=default_bboxes)
 
         # localization loss
         l = outputs[:, :, :4].unsqueeze(2)
-        g = self.calc_delta(gt=targets, df=default_bboxes)
-        l_loc = (self.smooth_l1(l - g).sum(dim=3) * is_match).sum(dim=2)
+        g = self._calc_delta(gt=targets, df=default_bboxes)
+        l_loc = (self._smooth_l1(l - g).sum(dim=3) * is_match).sum(dim=2)
 
         # confidence loss
         # positive
-        softmax_pos = self.softmax_cross_entropy(pr=outputs[:, :, 4:], gt=targets[:, :, 4:])
+        softmax_pos = self._softmax_cross_entropy(pr=outputs[:, :, 4:], gt=targets[:, :, 4:])
         l_conf_pos = (softmax_pos * is_match).sum(dim=2)
 
         # negative
         gt_void = torch.eye(C)[0].unsqueeze(0).unsqueeze(1).to(outputs.device)
-        softmax_neg = self.softmax_cross_entropy(pr=outputs[:, :, 4:], gt=gt_void)
+        softmax_neg = self._softmax_cross_entropy(pr=outputs[:, :, 4:], gt=gt_void)
         is_not_match = is_match.sum(dim=2, keepdims=True) == 0
         l_conf_neg = (softmax_neg * is_not_match).sum(dim=2)
 
         # hard negative mining
         pos_num = (is_match.sum(dim=2) != 0).sum(dim=1)
         neg_num = P - pos_num
-        pos_num, neg_num = self.split_pos_neg(pos_num, neg_num)
+        pos_num, neg_num = self._split_pos_neg(pos_num, neg_num)
 
-        pos_valid = l_conf_pos > torch.stack([self.k_plus_1_th_value(l_conf_pos[i], pos_num[i]) for i in range(N)]).unsqueeze(1)
-        neg_valid = l_conf_neg > torch.stack([self.k_plus_1_th_value(l_conf_neg[i], neg_num[i]) for i in range(N)]).unsqueeze(1)
+        pos_valid = l_conf_pos > torch.stack([self._k_plus_1_th_value(l_conf_pos[i], pos_num[i]) for i in range(N)]).unsqueeze(1)
+        neg_valid = l_conf_neg > torch.stack([self._k_plus_1_th_value(l_conf_neg[i], neg_num[i]) for i in range(N)]).unsqueeze(1)
 
         # calculate loss (if pos_num = 0, then loss = 0)
         pos_num = torch.where(pos_num > 0, 1 / pos_num.float(), pos_num.float())
@@ -205,7 +210,7 @@ class SSD(nn.Module):
 
         return loss
 
-    def match(self, gt: torch.Tensor, df: torch.Tensor, threshold: float = 0.5) -> torch.Tensor:
+    def _match(self, gt: torch.Tensor, df: torch.Tensor, threshold: float = 0.5) -> torch.Tensor:
         """adapt matching strategy
 
         Args:
@@ -226,7 +231,7 @@ class SSD(nn.Module):
 
         return torch.where(g_w * g_h > 0, w * h / (g_w * g_h + d_w * d_h - w * h), g_w * g_h) > threshold
 
-    def calc_delta(self, gt: torch.Tensor, df: torch.Tensor) -> torch.Tensor:
+    def _calc_delta(self, gt: torch.Tensor, df: torch.Tensor) -> torch.Tensor:
         """calculate g-hat
 
         Args:
@@ -248,7 +253,7 @@ class SSD(nn.Module):
 
         return torch.stack([g_cx, g_cy, g_w, g_h], dim=3)
 
-    def smooth_l1(self, x: torch.Tensor) -> torch.Tensor:
+    def _smooth_l1(self, x: torch.Tensor) -> torch.Tensor:
         """calculate smooth l1
 
         Args:
@@ -259,7 +264,7 @@ class SSD(nn.Module):
         """
         return torch.where(x.abs() < 1, 0.5 * x * x, x.abs() - 0.5)
 
-    def softmax_cross_entropy(self, pr: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
+    def _softmax_cross_entropy(self, pr: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
         """calculate softmax cross-entropy
 
         Args:
@@ -274,7 +279,7 @@ class SSD(nn.Module):
 
         return -(gt * F.log_softmax(pr, dim=3)).sum(dim=3)
 
-    def split_pos_neg(self, pos_num: torch.Tensor, neg_num: torch.Tensor) -> tuple:
+    def _split_pos_neg(self, pos_num: torch.Tensor, neg_num: torch.Tensor) -> tuple:
         """split pos:neg = 1:3
 
         Args:
@@ -287,7 +292,7 @@ class SSD(nn.Module):
         cond = pos_num * 3 > neg_num
         return torch.where(cond, neg_num // 3, pos_num), torch.where(cond, neg_num, pos_num * 3)
 
-    def k_plus_1_th_value(self, tensor: torch.Tensor, k: torch.Tensor) -> torch.Tensor:
+    def _k_plus_1_th_value(self, tensor: torch.Tensor, k: torch.Tensor) -> torch.Tensor:
         """get (k+1)-th largest value from tensor
 
         Args:

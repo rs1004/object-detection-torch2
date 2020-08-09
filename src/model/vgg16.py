@@ -82,13 +82,30 @@ class VGG16(nn.Module):
             x = self.classifier(x)
         return x
 
-    def normalize(self, x):
+    def normalize(self, x: torch.Tensor) -> torch.Tensor:
+        """normalize tensor
+
+        Args:
+            x (torch.Tensor): tensor
+
+        Returns:
+            torch.Tensor: normalized tensor
+        """
         mean = self.mean.reshape(1, 3, 1, 1).to(x.device)
         std = self.std.reshape(1, 3, 1, 1).to(x.device)
         x = x.sub(mean).div(std)
         return x
 
-    def loss(self, outputs, targets):
-        outputs = F.softmax(outputs, dim=1)
-        loss = nn.CrossEntropyLoss()(input=outputs, target=targets)
+    def loss(self, outputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """calculate loss
+
+        Args:
+            outputs (torch.Tensor): (N, C)
+            targets (torch.Tensor): (N, C)
+
+        Returns:
+            torch.Tensor: loss
+        """
+        outputs = F.log_softmax(outputs, dim=1)
+        loss = torch.sum(targets * outputs, dim=1).mean()
         return loss
