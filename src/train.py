@@ -1,6 +1,6 @@
 from dataset import PascalVOCDataset, Purpose
 from model import VGG16, SSD
-from augmentation import Compose, ToTensor, Normalize
+from augmentation import Compose, ToTensor
 from utils import collate_fn
 from pathlib import Path
 from tqdm import tqdm
@@ -30,8 +30,7 @@ if __name__ == '__main__':
     params_path = Path(args.result_dir) / args.purpose / args.params
 
     transform = Compose([
-        ToTensor(),
-        Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+        ToTensor()])
 
     dataset = PascalVOCDataset(
         purpose=args.purpose,

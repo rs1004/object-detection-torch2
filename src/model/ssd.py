@@ -15,6 +15,7 @@ class SSD(nn.Module):
 
         # vgg16 layer
         vgg16 = VGG16(weights_path=weights_path_vgg16)
+        self.normalize = vgg16.normalize
         num_table = {}
         name_map = {'Conv2d': 'conv', 'BatchNorm2d': 'bn', 'ReLU': 'act', 'MaxPool2d': 'pool'}
         layer_num = 1
@@ -79,6 +80,7 @@ class SSD(nn.Module):
         y = torch.empty((batch_size, 0, self.num_classes + 4))
         y = y.to(x.device)
 
+        x = self.normalize(x)
         for name, layer in self.features.items():
             x = layer(x)
             if name in self.classifier:

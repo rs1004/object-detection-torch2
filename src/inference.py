@@ -1,6 +1,6 @@
 from dataset import PascalVOCDataset
 from model import SSD
-from augmentation import Compose, ToTensor, Normalize
+from augmentation import Compose, ToTensor
 from utils import collate_fn, LabelMap
 from pathlib import Path
 from tqdm import tqdm
@@ -56,8 +56,7 @@ if __name__ == '__main__':
     out_dir.mkdir(parents=True, exist_ok=True)
 
     transform = Compose([
-        ToTensor(),
-        Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+        ToTensor()])
 
     dataset = PascalVOCDataset(
         purpose='detection',

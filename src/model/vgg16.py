@@ -8,6 +8,8 @@ class VGG16(nn.Module):
         # initialize
         super(VGG16, self).__init__()
         self.transfer_learning = transfer_learning
+        self.mean = torch.Tensor([0.485, 0.456, 0.406])
+        self.std = torch.Tensor([0.229, 0.224, 0.225])
 
         # feature extraction layer
         layers = []
@@ -71,12 +73,17 @@ class VGG16(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
+        x = self.normalize(x)
         x = self.features(x)
         x = x.view(x.size(0), -1)
         if self.transfer_learning:
             x = self.classifier2(x)
         else:
             x = self.classifier(x)
+        return x
+
+    def normalize(self, x):
+        x = x.sub(self.mean.reshape(1, 3, 1, 1)).div(self.std.reshape(1, 3, 1, 1))
         return x
 
     def loss(self, outputs, targets):
