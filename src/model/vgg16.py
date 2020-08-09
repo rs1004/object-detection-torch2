@@ -83,7 +83,9 @@ class VGG16(nn.Module):
         return x
 
     def normalize(self, x):
-        x = x.sub(self.mean.reshape(1, 3, 1, 1)).div(self.std.reshape(1, 3, 1, 1))
+        mean = self.mean.reshape(1, 3, 1, 1).to(x.device)
+        std = self.std.reshape(1, 3, 1, 1).to(x.device)
+        x = x.sub(mean).div(std)
         return x
 
     def loss(self, outputs, targets):
