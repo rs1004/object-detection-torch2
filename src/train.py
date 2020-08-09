@@ -70,9 +70,11 @@ if __name__ == '__main__':
             params = json.load(f)
         min_loss = params['min_loss']
         lr = params['lr']
+        start_epoch = params['last_epoch']
     else:
         min_loss = None
         lr = args.lr
+        start_epoch = 0
 
     optimizer = optim.Adam(net.train_params(), lr=lr, weight_decay=args.weight_decay)
     scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=args.gamma)
@@ -80,11 +82,11 @@ if __name__ == '__main__':
 
     running_loss = 0.0
     torch.autograd.set_detect_anomaly(True)
-    for epoch in range(args.epochs):
+    for epoch in range(1 + start_epoch, args.epochs + start_epoch + 1):
         with tqdm(dataloader, total=len(dataloader)) as pbar:
             for i, (images, gts) in enumerate(pbar, start=1):
                 # description
-                pbar.set_description(f'[Epoch {epoch+1}/{args.epochs}] loss: {running_loss/i}')
+                pbar.set_description(f'[Epoch {epoch}/{args.epochs + start_epoch}] loss: {running_loss / i}')
 
                 # to GPU device
                 images = images.to(device)
@@ -111,7 +113,7 @@ if __name__ == '__main__':
                 # save weights
                 torch.save(net.state_dict(), weights_path)
                 # save params
-                params = {'min_loss': running_loss, 'lr': scheduler.get_last_lr()[0]}
+                params = {'min_loss': running_loss, 'lr': scheduler.get_last_lr()[0], 'last_epoch': epoch}
                 with open(params_path, 'w') as f:
                     json.dump(params, f, indent=4)
 
