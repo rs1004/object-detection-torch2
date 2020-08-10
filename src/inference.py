@@ -11,7 +11,7 @@ import torch.nn.functional as F
 import argparse
 
 
-def calc_bbox_locs(pr: torch.Tensor, df: torch.Tensor, imsize: int) -> torch.Tensor:
+def calc_bbox_location(pr: torch.Tensor, df: torch.Tensor, imsize: int) -> torch.Tensor:
     """calculate bbox location
 
     Args:
@@ -95,7 +95,7 @@ if __name__ == '__main__':
 
                 # generate image
                 outputs = net(images)
-                bbox_locs = calc_bbox_locs(pr=outputs, df=defaults, imsize=args.imsize)
+                bbox_locs = calc_bbox_location(pr=outputs, df=defaults, imsize=args.imsize)
                 bbox_confs = outputs[:, :, 4:]
                 for i in range(args.batch_size):
                     image = Image.fromarray((images[i].permute(1, 2, 0).cpu().numpy() * 255).astype('uint8'))
