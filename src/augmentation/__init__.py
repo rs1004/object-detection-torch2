@@ -1,2 +1,5 @@
-from .compose import Compose  # noqa: F401
-from .to_tensor import ToTensor  # noqa: F401
+# flake8: noqa
+
+from .compose import Compose
+from .to_tensor import ToTensor
+from .random import *
