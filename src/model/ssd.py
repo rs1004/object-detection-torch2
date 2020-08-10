@@ -1,3 +1,4 @@
+import pathlib
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -5,7 +6,14 @@ from model import VGG16
 
 
 class SSD(nn.Module):
-    def __init__(self, num_classes, weights_path=None, weights_path_vgg16=None):
+    def __init__(self, num_classes: int, weights_path: pathlib.Path = None, weights_path_vgg16: pathlib.Path = None):
+        """initialize
+
+        Args:
+            num_classes (int): number of label classes
+            weights_path (pathlib.Path, optional): ssd weights path. Defaults to None.
+            weights_path_vgg16 (pathlib.Path, optional): vgg16 weights path. Defaults to None.
+        """
         # initialize
         super(SSD, self).__init__()
         self.num_classes = num_classes
@@ -75,7 +83,15 @@ class SSD(nn.Module):
         else:
             self._initialize_weights()
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """forward propergation
+
+        Args:
+            x (torch.Tensor): (N, 3, 300, 300)
+
+        Returns:
+            torch.Tensor: (N, P, 4 + C)
+        """
         batch_size = x.size(0)
         y = torch.empty((batch_size, 0, self.num_classes + 4))
         y = y.to(x.device)
@@ -117,6 +133,8 @@ class SSD(nn.Module):
         return default_bboxes
 
     def _initialize_weights(self):
+        """initialize weights params
+        """
         is_vgg = True
         for k, m in self.features.items():
             if k == 'conv_6_1':

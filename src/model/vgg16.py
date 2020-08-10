@@ -1,10 +1,18 @@
+import pathlib
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 
 class VGG16(nn.Module):
-    def __init__(self, weights_path=None, num_classes=20, transfer_learning=False):
+    def __init__(self, weights_path: pathlib.Path = None, num_classes: int = 20, transfer_learning: bool = False):
+        """initialize
+
+        Args:
+            weights_path (pathlib.Path, optional): [description]. Defaults to None.
+            num_classes (int, optional): number of label classes. Defaults to 20.
+            transfer_learning (bool, optional): set to true when doing transfer learning. Defaults to False.
+        """
         # initialize
         super(VGG16, self).__init__()
         self.transfer_learning = transfer_learning
@@ -67,12 +75,22 @@ class VGG16(nn.Module):
                     param.requires_grad = False
 
     def _initialize_weights(self):
+        """initialize weights params
+        """
         for m in self.classifier2.modules():
             if isinstance(m, nn.Linear):
                 nn.init.normal_(m.weight, 0, 0.01)
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """forward propagation
+
+        Args:
+            x (torch.Tensor): (N, 3, 300, 300)
+
+        Returns:
+            torch.Tensor: (N, 1000 or num_classes)
+        """
         x = self.normalize(x)
         x = self.features(x)
         x = x.view(x.size(0), -1)

@@ -8,10 +8,22 @@ import torch
 
 
 class PascalVOCDataset(Dataset):
-    def __init__(self, purpose, data_dirs, data_list_file_name, imsize, transform=None):
+    def __init__(self, purpose: str, data_dirs: list, data_list_file_name: str, imsize: int, transform=None):
+        """[summary]
+
+        Args:
+            purpose (str): 'classification' or 'detection'
+            data_dirs (list): data dirs (string can also be set)
+            data_list_file_name (str): ex) 'trainval.txt', 'test.txt'
+            imsize (int): image size for resize
+            transform (augmentation.Compose, optional): set of augmentation. Defaults to None.
+
+        Raises:
+            ValueError: occurs when 'purpose' is invalid
+        """
         self.transform = transform
         self.purpose = purpose
-        if self.purpose not in Purpose.show_all():
+        if self.purpose not in Purpose.get_all():
             raise ValueError(f'purpose "{self.purpose}" is isvalid')
         self.imsize = imsize
         self.data_list = self._get_list(data_dirs, data_list_file_name)
@@ -23,25 +35,35 @@ class PascalVOCDataset(Dataset):
 
     def __getitem__(self, i):
         if self.purpose == Purpose.CLASSIFICATION.value:
-            class_name, coord, image_path = self.data_list[i]
+            id, coord, image_path = self.data_list[i]
 
             image = Image.open(image_path).crop(coord).resize((self.imsize, self.imsize))
-            id = self.labelmap.name2id(class_name)
             gt = torch.eye(len(self.labelmap))[id]
             if self.transform:
                 image, gt = self.transform(image, gt)
 
         elif self.purpose == Purpose.DETECTION.value:
-            image_path, gt_path = self.data_list[i]
+            image_path, anno_path = self.data_list[i]
 
             image = Image.open(image_path).resize((self.imsize, self.imsize))
-            gt = self._get_gt(gt_path)
+            gt = self._get_gt(anno_path)
             if self.transform:
                 image, gt = self.transform(image, gt)
 
         return image, gt
 
-    def _get_list(self, data_dirs, data_list_file_name):
+    def _get_list(self, data_dirs: list, data_list_file_name: str) -> list:
+        """get data list
+
+        Args:
+            data_dirs (list): data dirs (string can also be set)
+            data_list_file_name (str): ex) 'trainval.txt', 'test.txt'
+
+        Returns:
+            list:
+                * classification : [[class_id, bbox_coordinate, image_file_path], …]
+                * detection      : [[image_file_path, annotation_file_path], …]
+        """
         if isinstance(data_dirs, str):
             data_dirs = [data_dirs]
 
@@ -54,23 +76,31 @@ class PascalVOCDataset(Dataset):
 
             for i in ids[:-1]:
                 image_path = Path(data_dir) / 'JPEGImages' / f'{i}.jpg'
-                gt_path = Path(data_dir) / 'Annotations' / f'{i}.xml'
+                anno_path = Path(data_dir) / 'Annotations' / f'{i}.xml'
                 if self.purpose == Purpose.CLASSIFICATION.value:
-                    root = ET.parse(gt_path).getroot()
+                    root = ET.parse(anno_path).getroot()
                     for obj in root.iter('object'):
-                        class_name = obj.find('name').text
+                        id = self.labelmap.name2id(obj.find('name').text)
                         bbox = obj.find('bndbox')
                         coord = int(bbox.find('xmin').text), int(bbox.find('ymin').text), int(bbox.find('xmax').text), int(bbox.find('ymax').text)
-                        data_list.append([class_name, coord, image_path])
+                        data_list.append([id, coord, image_path])
                 elif self.purpose == Purpose.DETECTION.value:
-                    data_list.append([image_path, gt_path])
+                    data_list.append([image_path, anno_path])
 
         return data_list
 
-    def _get_gt(self, gt_path):
+    def _get_gt(self, anno_path: Path) -> torch.Tensor:
+        """get ground truth tensor
+
+        Args:
+            anno_path (Path): Annotation xml file path
+
+        Returns:
+            torch.Tensor: (G, 4 + C)
+        """
         num_classes = self.num_classes + 1  # add void
 
-        root = ET.parse(gt_path).getroot()
+        root = ET.parse(anno_path).getroot()
         gt = torch.empty(0, 4 + num_classes)
         for size in root.iter('size'):
             width = int(size.find('width').text)
@@ -91,5 +121,10 @@ class Purpose(Enum):
     DETECTION = 'detection'
 
     @classmethod
-    def show_all(cls):
+    def get_all(cls) -> set:
+        """show all enum values
+
+        Returns:
+            set: all enum values
+        """
         return set(c.value for c in cls)
