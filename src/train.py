@@ -1,10 +1,10 @@
 from dataset import PascalVOCDataset, Purpose
 from model import VGG16, SSD
-from augmentation import Compose, ToTensor
 from utils import collate_fn
 from pathlib import Path
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
+import augmentation as aug
 import torch.optim as optim
 import torch
 import argparse
@@ -29,8 +29,14 @@ if __name__ == '__main__':
     weights_path = Path(args.result_dir) / args.purpose / args.weights
     params_path = Path(args.result_dir) / args.purpose / args.params
 
-    transform = Compose([
-        ToTensor()])
+    transform = aug.Compose([
+        aug.RandomColorJitter(p=0.5),
+        aug.RandomPerspective(p=0.5),
+        aug.RandomFlip(p=0.5),
+        aug.RandomScale(p=0.5),
+        aug.RandomShift(p=0.5),
+        aug.ToTensor(),
+        aug.RandomErasing(p=0.5, max_iter=3)])
 
     dataset = PascalVOCDataset(
         purpose=args.purpose,

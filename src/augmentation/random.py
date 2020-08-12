@@ -84,7 +84,7 @@ class RandomShift(torch.nn.Module):
 
 
 class RandomErasing(RandomErasing):
-    def __init__(self, p=0.5, scale=(0.02, 0.33), ratio=(0.3, 3.3), max_iter=1):
+    def __init__(self, p=0.5, scale=(0.02, 0.33), ratio=(0.5, 2.0), max_iter=1):
         super(RandomErasing, self).__init__(p=p, scale=scale, ratio=ratio)
         self.max_iter = max_iter
 
