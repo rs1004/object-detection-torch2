@@ -17,9 +17,9 @@ if __name__ == '__main__':
     parser.add_argument('--imsize', type=int, default=300)
     parser.add_argument('--batch_size', type=int, default=4)
     parser.add_argument('--epochs', type=int, default=1)
-    parser.add_argument('--lr', type=float, default=0.0001)
+    parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--weight_decay', type=float, default=0.0005)
-    parser.add_argument('--gamma', type=float, default=0.95)
+    parser.add_argument('--gamma', type=float, default=0.98)
     parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--result_dir', type=str, default='./result')
     parser.add_argument('--weights', type=str, default='weights.pth')
@@ -64,7 +64,7 @@ if __name__ == '__main__':
 
     dl_val = torch.utils.data.DataLoader(
         dataset=ds_val,
-        batch_size=int(args.batch_size * len(ds_val) / len(ds_train)),
+        batch_size=args.batch_size,
         num_workers=args.num_workers,
         collate_fn=collate_fn)
 
@@ -104,10 +104,10 @@ if __name__ == '__main__':
     running_loss = val_loss = 0.0
     torch.autograd.set_detect_anomaly(True)
     for epoch in range(1 + start_epoch, args.epochs + start_epoch + 1):
-        with tqdm(zip(dl_train, dl_val), total=len(dl_train)) as pbar:
-            for i, ((ims_train, gts_train), (ims_val, gts_val)) in enumerate(pbar, start=1):
+        with tqdm(dl_train, total=len(dl_train)) as pbar:
+            for i, (ims_train, gts_train) in enumerate(pbar, start=1):
                 # description
-                pbar.set_description(f'[Epoch {epoch}/{args.epochs + start_epoch}] loss: {round(running_loss / i, 5)}, val_loss: {round(val_loss / i, 5)}')
+                pbar.set_description(f'[Epoch {epoch}/{args.epochs + start_epoch}] loss: {round(running_loss / i, 5)}')
 
                 # to GPU device
                 ims_train = ims_train.to(device)
@@ -124,8 +124,10 @@ if __name__ == '__main__':
                 optimizer.step()
 
                 running_loss += loss.item()
+            running_loss /= i
 
-                # validation loss
+            for i, (ims_val, gts_val) in enumerate(dl_val, start=1):
+                # calculate validation loss
                 ims_val = ims_val.to(device)
                 gts_val = gts_val.to(device)
 
@@ -134,9 +136,8 @@ if __name__ == '__main__':
 
                 loss = net.loss(**loss_args)
                 val_loss += loss.item()
-
-            running_loss /= i
             val_loss /= i
+
             writer.add_scalar('loss', running_loss, epoch)
             writer.add_scalar('val_loss', val_loss, epoch)
             writer.add_scalar('lr', scheduler.get_last_lr()[0], epoch)
@@ -150,7 +151,7 @@ if __name__ == '__main__':
                 with open(params_path, 'w') as f:
                     json.dump(params, f, indent=4)
 
-            running_loss = 0.0
+            running_loss = val_loss = 0.0
             scheduler.step()
 
     print('Finished Training')
