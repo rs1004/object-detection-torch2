@@ -29,7 +29,7 @@ if __name__ == '__main__':
     weights_path = Path(args.result_dir) / args.purpose / args.weights
     params_path = Path(args.result_dir) / args.purpose / args.params
 
-    transform = aug.Compose([
+    aug_train = aug.Compose([
         aug.RandomColorJitter(p=0.5),
         aug.RandomPerspective(p=0.5),
         aug.RandomFlip(p=0.5),
@@ -38,30 +38,46 @@ if __name__ == '__main__':
         aug.ToTensor(),
         aug.RandomErasing(p=0.5, max_iter=3)])
 
-    dataset = PascalVOCDataset(
+    aug_val = aug.Compose([
+        aug.ToTensor()])
+
+    ds_train = PascalVOCDataset(
         purpose=args.purpose,
         data_dirs=['/work/data/VOCdevkit/VOC2007', '/work/data/VOCdevkit/VOC2012'],
         data_list_file_name='trainval.txt',
         imsize=args.imsize,
-        transform=transform)
+        transform=aug_train)
 
-    dataloader = torch.utils.data.DataLoader(
-        dataset=dataset,
+    ds_val = PascalVOCDataset(
+        purpose=args.purpose,
+        data_dirs=['/work/data/VOCdevkit/VOC2007'],
+        data_list_file_name='test.txt',
+        imsize=args.imsize,
+        transform=aug_train)
+
+    dl_train = torch.utils.data.DataLoader(
+        dataset=ds_train,
         batch_size=args.batch_size,
         shuffle=True,
+        num_workers=args.num_workers,
+        collate_fn=collate_fn)
+
+    dl_val = torch.utils.data.DataLoader(
+        dataset=ds_val,
+        batch_size=int(args.batch_size * len(ds_val) / len(ds_train)),
         num_workers=args.num_workers,
         collate_fn=collate_fn)
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     if args.purpose == Purpose.CLASSIFICATION.value:
         net = VGG16(
-            num_classes=dataset.num_classes,
+            num_classes=ds_train.num_classes,
             weights_path=weights_path
         )
         loss_args = {}
     elif args.purpose == Purpose.DETECTION.value:
         net = SSD(
-            num_classes=dataset.num_classes + 1,  # add void
+            num_classes=ds_train.num_classes + 1,  # add void
             weights_path=weights_path,
             weights_path_vgg16=Path(args.result_dir) / 'classification' / args.weights
         )
@@ -85,32 +101,44 @@ if __name__ == '__main__':
     scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=args.gamma)
     writer = SummaryWriter(log_dir='./logs')
 
-    running_loss = 0.0
+    running_loss = val_loss = 0.0
     torch.autograd.set_detect_anomaly(True)
     for epoch in range(1 + start_epoch, args.epochs + start_epoch + 1):
-        with tqdm(dataloader, total=len(dataloader)) as pbar:
-            for i, (images, gts) in enumerate(pbar, start=1):
+        with tqdm(zip(dl_train, dl_val), total=len(dl_train)) as pbar:
+            for i, ((ims_train, gts_train), (ims_val, gts_val)) in enumerate(pbar, start=1):
                 # description
-                pbar.set_description(f'[Epoch {epoch}/{args.epochs + start_epoch}] loss: {running_loss / i}')
+                pbar.set_description(f'[Epoch {epoch}/{args.epochs + start_epoch}] loss: {round(running_loss / i, 5)}, val_loss: {round(val_loss / i, 5)}')
 
                 # to GPU device
-                images = images.to(device)
-                gts = gts.to(device)
+                ims_train = ims_train.to(device)
+                gts_train = gts_train.to(device)
 
                 # zero the parameter gradients
                 optimizer.zero_grad()
 
                 # forward + backward + optimize
-                outputs = net(images)
-                loss_args.update({'outputs': outputs, 'targets': gts})
+                outputs = net(ims_train)
+                loss_args.update({'outputs': outputs, 'targets': gts_train})
                 loss = net.loss(**loss_args)
                 loss.backward()
                 optimizer.step()
 
                 running_loss += loss.item()
 
+                # validation loss
+                ims_val = ims_val.to(device)
+                gts_val = gts_val.to(device)
+
+                outputs = net(ims_val)
+                loss_args.update({'outputs': outputs, 'targets': gts_val})
+
+                loss = net.loss(**loss_args)
+                val_loss += loss.item()
+
             running_loss /= i
+            val_loss /= i
             writer.add_scalar('loss', running_loss, epoch)
+            writer.add_scalar('val_loss', val_loss, epoch)
             writer.add_scalar('lr', scheduler.get_last_lr()[0], epoch)
 
             if (min_loss is None) or (running_loss < min_loss):
