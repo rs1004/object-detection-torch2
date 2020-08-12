@@ -8,9 +8,9 @@ class RandomColorJitter(ColorJitter):
         super(RandomColorJitter, self).__init__(brightness, contrast, saturation, hue)
         self.p = p
 
-    def forward(self, img, gt):
+    def __call__(self, img, gt):
         if torch.rand(1) < self.p:
-            img = super(RandomColorJitter, self).forward(img)
+            img = super(RandomColorJitter, self).__call__(img)
         return img, gt
 
 
@@ -32,7 +32,7 @@ class RandomFlip(torch.nn.Module):
         """
         self.p = p
 
-    def forward(self, img, gt):
+    def __call__(self, img, gt):
         if torch.rand(1) < self.p:
             img = hflip(img)
             gt[:, 0:2] = 1 - gt[:, 0:2]
@@ -50,7 +50,7 @@ class RandomScale(torch.nn.Module):
         self.p = p
         self.ratio_range = ratio_range
 
-    def forward(self, img, gt):
+    def __call__(self, img, gt):
         if torch.rand(1) < self.p:
             low, high = self.ratio_range
             ratio = low + torch.rand(1).item() * (high - low)
@@ -71,7 +71,7 @@ class RandomShift(torch.nn.Module):
         self.vertical_upper_limit = vertical_upper_limit
         self.horizontal_upper_limit = horizontal_upper_limit
 
-    def forward(self, img, gt):
+    def __call__(self, img, gt):
         if torch.rand(1) < self.p:
             sign = torch.randn(1) > 0
             horizontal_ratio = sign * (1. + torch.rand(1).item() * (self.horizontal_upper_limit - 1.))
@@ -88,8 +88,8 @@ class RandomErasing(RandomErasing):
         super(RandomErasing, self).__init__(p=p, scale=scale, ratio=ratio)
         self.max_iter = max_iter
 
-    def forward(self, img, gt):
+    def __call__(self, img, gt):
         iter = torch.randint(low=1, high=self.max_iter + 1, size=(1,)).item()
         for _ in range(iter):
-            img = super(RandomErasing, self).forward(img)
+            img = super(RandomErasing, self).__call__(img)
         return img, gt
