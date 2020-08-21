@@ -1,6 +1,6 @@
 import torch
 from torchvision.transforms.functional import hflip
-from torchvision.transforms import ColorJitter, RandomPerspective, RandomErasing
+from torchvision.transforms import ColorJitter, RandomErasing
 
 
 class RandomColorJitter(ColorJitter):
@@ -27,52 +27,6 @@ class RandomFlip(torch.nn.Module):
         if torch.rand(1) < self.p:
             img = hflip(img)
             gt[:, 0] = 1 - gt[:, 0]
-        return img, gt
-
-
-class RandomScale(torch.nn.Module):
-    def __init__(self, p: float = 0.5, ratio_range: tuple = (0.9, 1.1)):
-        """initialize
-
-        Args:
-            p (float, optional): probability of executing. Defaults to 0.5.
-            ratio_range (tuple, optional): (lower_limit, upper_limit). Defaults to (0.9, 1.1).
-        """
-        self.p = p
-        self.ratio_range = ratio_range
-
-    def __call__(self, img, gt):
-        if torch.rand(1) < self.p:
-            low, high = self.ratio_range
-            ratio = low + torch.rand(1).item() * (high - low)
-            gt[:, 2:4] = gt[:, 2:4] * ratio
-        return img, gt
-
-
-class RandomShift(torch.nn.Module):
-    def __init__(self, p: float = 0.5, h_ratio_range: tuple = (0.95, 1.05), v_ratio_range: tuple = (0.95, 1.05)):
-        """initialize
-
-        Args:
-            p (float, optional): probability of executing. Defaults to 0.5.
-            h_ratio_range (tuple, optional): (lower_limit, upper_limit). Defaults to (0.95, 1.05).
-            v_ratio_range (tuple, optional): (lower_limit, upper_limit). Defaults to (0.95, 1.05)
-        """
-        self.p = p
-        self.h_ratio_range = h_ratio_range
-        self.v_ratio_range = v_ratio_range
-
-    def __call__(self, img, gt):
-        if torch.rand(1) < self.p:
-            low, high = self.h_ratio_range
-            ratio = low + torch.rand(1).item() * (high - low)
-            gt[:, 0] = gt[:, 0] * ratio
-
-        if torch.rand(1) < self.p:
-            low, high = self.v_ratio_range
-            ratio = low + torch.rand(1).item() * (high - low)            
-            gt[:, 1] = gt[:, 1] * ratio
-
         return img, gt
 
 
