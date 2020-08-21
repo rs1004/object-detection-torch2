@@ -31,7 +31,6 @@ if __name__ == '__main__':
 
     aug_train = aug.Compose([
         aug.RandomColorJitter(p=0.5),
-        aug.RandomPerspective(p=0.5),
         aug.RandomFlip(p=0.5),
         aug.RandomScale(p=0.5),
         aug.RandomShift(p=0.5),
