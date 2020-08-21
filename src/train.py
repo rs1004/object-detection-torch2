@@ -123,8 +123,9 @@ if __name__ == '__main__':
                 optimizer.step()
 
                 running_loss += loss.item()
-            running_loss /= i
+        running_loss /= i
 
+        with torch.no_grad():
             for i, (ims_val, gts_val) in enumerate(dl_val, start=1):
                 # calculate validation loss
                 ims_val = ims_val.to(device)
@@ -135,23 +136,23 @@ if __name__ == '__main__':
 
                 loss = net.loss(**loss_args)
                 val_loss += loss.item()
-            val_loss /= i
+        val_loss /= i
 
-            writer.add_scalar('loss', running_loss, epoch)
-            writer.add_scalar('val_loss', val_loss, epoch)
-            writer.add_scalar('lr', scheduler.get_last_lr()[0], epoch)
+        writer.add_scalar('loss', running_loss, epoch)
+        writer.add_scalar('val_loss', val_loss, epoch)
+        writer.add_scalar('lr', scheduler.get_last_lr()[0], epoch)
 
-            if (min_loss is None) or (running_loss < min_loss):
-                weights_path.parent.mkdir(parents=True, exist_ok=True)
-                # save weights
-                torch.save(net.state_dict(), weights_path)
-                # save params
-                params = {'min_loss': running_loss, 'lr': scheduler.get_last_lr()[0], 'last_epoch': epoch}
-                with open(params_path, 'w') as f:
-                    json.dump(params, f, indent=4)
+        if (min_loss is None) or (running_loss < min_loss):
+            weights_path.parent.mkdir(parents=True, exist_ok=True)
+            # save weights
+            torch.save(net.state_dict(), weights_path)
+            # save params
+            params = {'min_loss': running_loss, 'lr': scheduler.get_last_lr()[0], 'last_epoch': epoch}
+            with open(params_path, 'w') as f:
+                json.dump(params, f, indent=4)
 
-            running_loss = val_loss = 0.0
-            scheduler.step()
+        running_loss = val_loss = 0.0
+        scheduler.step()
 
     print('Finished Training')
 
