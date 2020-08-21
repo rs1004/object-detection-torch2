@@ -103,10 +103,11 @@ if __name__ == '__main__':
     running_loss = val_loss = 0.0
     torch.autograd.set_detect_anomaly(True)
     for epoch in range(1 + start_epoch, args.epochs + start_epoch + 1):
+        running_loss = 0.0
         with tqdm(dl_train, total=len(dl_train)) as pbar:
             for i, (ims_train, gts_train) in enumerate(pbar, start=1):
                 # description
-                pbar.set_description(f'[Epoch {epoch}/{args.epochs + start_epoch}] loss: {round(running_loss / i, 5)}')
+                pbar.set_description(f'[Epoch {epoch}/{args.epochs + start_epoch}] loss: {round(running_loss / i, 5)}, val_loss: {round(val_loss, 5)}')
 
                 # to GPU device
                 ims_train = ims_train.to(device)
@@ -125,6 +126,7 @@ if __name__ == '__main__':
                 running_loss += loss.item()
         running_loss /= i
 
+        val_loss = 0.0
         with torch.no_grad():
             for i, (ims_val, gts_val) in enumerate(dl_val, start=1):
                 # calculate validation loss
@@ -151,7 +153,6 @@ if __name__ == '__main__':
             with open(params_path, 'w') as f:
                 json.dump(params, f, indent=4)
 
-        running_loss = val_loss = 0.0
         scheduler.step()
 
     print('Finished Training')
