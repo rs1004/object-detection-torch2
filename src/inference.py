@@ -11,13 +11,12 @@ import torch.nn.functional as F
 import argparse
 
 
-def calc_bbox_location(pr: torch.Tensor, df: torch.Tensor, imsize: int) -> torch.Tensor:
-    """calculate bbox location
+def calc_coordicate(pr: torch.Tensor, df: torch.Tensor) -> torch.Tensor:
+    """calculate pred-bbox coordinate
 
     Args:
         pr (torch.Tensor): (N, P, 4)
         df (torch.Tensor): (P, 4) -> (1, P, 4)
-        imsize (int): image size
 
     Returns:
         torch.Tensor (N, P, 4): location coordinate
@@ -33,19 +32,77 @@ def calc_bbox_location(pr: torch.Tensor, df: torch.Tensor, imsize: int) -> torch
     p_w = d_w * torch.exp(p_w)
     p_h = d_h * torch.exp(p_h)
 
-    # (cx, cy, w, h) => (xmin, ymin, xmax, ymax)
-    p_x_min = p_cx - p_w / 2
-    p_y_min = p_cy - p_h / 2
-    p_x_max = p_cx + p_w / 2
-    p_y_max = p_cy + p_h / 2
+    return torch.stack([p_cx, p_cy, p_w, p_h], dim=2)
 
-    return torch.stack([p_x_min, p_y_min, p_x_max, p_y_max], dim=2) * imsize
+
+def calc_score(pr: torch.Tensor) -> torch.Tensor:
+    """calculate pred-bbox score
+
+    Args:
+        pr (torch.Tensor): (N, P, C)
+
+    Returns:
+        torch.Tensor (N, P, C-4): class score
+    """
+    _, _, C = pr.shape
+
+    max_mask = torch.eye(C - 4)[torch.max(pr[:, :, 4:], dim=2).indices].to(pr.device)
+    return F.softmax(pr[:, :, 4:], dim=2) * max_mask
+
+
+def calc_iou(t: torch.Tensor, s: torch.Tensor) -> torch.Tensor:
+    """calculate iou
+
+    Args:
+        t (torch.Tensor): (N, T, 4) -> (N, T, 1, 4)
+        s (torch.Tensor): (N, S, 4) -> (N, 1, S, 4)
+
+    Returns:
+        torch.Tensor: (N, T, S)
+    """
+    t = t.unsqueeze(2)
+    s = s.unsqueeze(1)
+
+    t_cx, t_cy, t_w, t_h = [t[:, :, :, i] for i in range(4)]
+    s_cx, s_cy, s_w, s_h = [s[:, :, :, i] for i in range(4)]
+
+    w = (torch.min(t_cx + t_w / 2, s_cx + s_w / 2) - torch.max(t_cx - t_w / 2, s_cx - s_w / 2)).clamp(min=0)
+    h = (torch.min(t_cy + t_h / 2, s_cy + s_h / 2) - torch.max(t_cy - t_h / 2, s_cy - s_h / 2)).clamp(min=0)
+
+    return torch.where(w * h > 0, w * h / (t_w * t_h + s_w * s_h - w * h), w * h)
+
+
+def non_maximum_suppression(outputs: torch.Tensor, iou_thresh: float = 0.5) -> torch.Tensor:
+    """execute non-maximum-suppression
+
+    Args:
+        outputs (torch.Tensor): (N, P, C)
+        iou_thresh (float, optional): Remove predicted values ​​above this threshold. Defaults to 0.5.
+
+    Returns:
+        torch.Tensor: (N, P, C)
+    """
+    def nms(t):
+        suppressed_t = t[:, :, :, 0]
+        for i in range(1, P):
+            t[:, :, :, i] *= suppressed_t
+            suppressed_t += t[:, :, :, i]
+        return suppressed_t
+
+    N, P, _ = outputs.shape
+
+    select_flags = iou_thresh < calc_iou(outputs, outputs) + torch.eye(P).bool().to(outputs.device)
+    orders = torch.sort(outputs[:, :, 4:], dim=1, descending=True).indices
+    valid_mask = nms(t=torch.stack([select_flags[n][orders[n]] for n in range(N)]))
+    outputs[:, :, 4:] = outputs[:, :, 4:] * valid_mask
+
+    return outputs
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--imsize', type=int, default=300)
-    parser.add_argument('--batch_size', type=int, default=4)
+    parser.add_argument('--batch_size', type=int, default=2)
     parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--result_dir', type=str, default='./result')
     parser.add_argument('--weights', type=str, default='weights.pth')
@@ -95,20 +152,26 @@ if __name__ == '__main__':
 
                 # generate image
                 outputs = net(images)
-                bbox_locs = calc_bbox_location(pr=outputs, df=defaults, imsize=args.imsize)
+
+                outputs[:, :, :4] = calc_coordicate(pr=outputs, df=defaults)
+                outputs[:, :, 4:] = calc_score(pr=outputs)
+                outputs = non_maximum_suppression(outputs=outputs)
+
+                bbox_locs = outputs[:, :, :4]
                 bbox_confs = outputs[:, :, 4:]
-                for i in range(args.batch_size):
+                for i in range(len(images)):
                     image = Image.fromarray((images[i].permute(1, 2, 0).cpu().numpy() * 255).astype('uint8'))
                     draw = ImageDraw.Draw(image)
-                    locs = bbox_locs[i].cpu()
-                    labels = torch.max(F.softmax(bbox_confs[i], dim=1).cpu(), dim=1)
+                    locs = bbox_locs[i]
+                    labels = torch.max(bbox_confs[i], dim=1)
                     for loc, class_id, score in zip(locs, labels.indices, labels.values):
                         # case: void or noise
-                        if (class_id == 0) or (score < 0.5):
+                        if class_id == 0:
                             continue
 
                         # calc coord
-                        xmin, ymin, xmax, ymax = [_.item() for _ in loc]
+                        cx, cy, w, h = [_.item() for _ in loc * args.imsize]
+                        xmin, ymin, xmax, ymax = cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2
                         left_top = (max(xmin, 0), max(ymin, 0))
                         right_bottom = (min(xmax, args.imsize), min(ymax, args.imsize))
 
