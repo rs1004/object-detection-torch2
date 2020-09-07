@@ -82,7 +82,15 @@ def non_maximum_suppression(outputs: torch.Tensor, iou_thresh: float = 0.5) -> t
     Returns:
         torch.Tensor: (N, P, C)
     """
-    def nms(t):
+    def nms(t: torch.Tensor) -> torch.Tensor:
+        """suppress tensor
+
+        Args:
+            t (torch.Tensor): (N, P, C-4, P)
+
+        Returns:
+            torch.Tensor: (N, P, C-4)
+        """
         suppressed_t = t[:, :, :, 0]
         for i in range(1, P):
             t[:, :, :, i] *= suppressed_t
