@@ -49,14 +49,121 @@ PASCAL VOC (Visual Object Classes) 2007, 2012を使用。
 <a id="anchor4"></a>
 
 # モデルアーキテクチャ
+SSD モデルは [論文](https://arxiv.org/pdf/1512.02325.pdf) 準拠で作成した。</br>
+本実装は `features` と `detectors` の2つのモジュールで構成した。
+* `features`
+  * 特徴量抽出層の群。ベースは vgg16_bn (act_5_3まで) を使用した。
+* `detectors`
+  * 検出器の群。`features` の所定の activation 直後のテンソルに対してかける。
 
-準備中
+<details><summary>アーキテクチャ</summary><div>
+
+```
+SSD(
+  (features): ModuleDict(
+    (conv_1_1): Conv2d(3, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    (bn_1_1): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (act_1_1): ReLU(inplace=True)
+    (conv_1_2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    (bn_1_2): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (act_1_2): ReLU(inplace=True)
+    (pool_1): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+    (conv_2_1): Conv2d(64, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    (bn_2_1): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (act_2_1): ReLU(inplace=True)
+    (conv_2_2): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    (bn_2_2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (act_2_2): ReLU(inplace=True)
+    (pool_2): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+    (conv_3_1): Conv2d(128, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    (bn_3_1): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (act_3_1): ReLU(inplace=True)
+    (conv_3_2): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    (bn_3_2): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (act_3_2): ReLU(inplace=True)
+    (conv_3_3): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    (bn_3_3): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (act_3_3): ReLU(inplace=True)
+    (pool_3): MaxPool2d(kernel_size=2, stride=2, padding=1, dilation=1, ceil_mode=False)
+    (conv_4_1): Conv2d(256, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    (bn_4_1): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (act_4_1): ReLU(inplace=True)
+    (conv_4_2): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    (bn_4_2): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (act_4_2): ReLU(inplace=True)
+    (conv_4_3): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    (bn_4_3): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (act_4_3): ReLU(inplace=True)
+    (pool_4): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+    (conv_5_1): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    (bn_5_1): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (act_5_1): ReLU(inplace=True)
+    (conv_5_2): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    (bn_5_2): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (act_5_2): ReLU(inplace=True)
+    (conv_5_3): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    (bn_5_3): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (act_5_3): ReLU(inplace=True)
+    (conv_6_1): Conv2d(512, 1024, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    (bn_6_1): BatchNorm2d(1024, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (act_6_1): ReLU(inplace=True)
+    (conv_7_1): Conv2d(1024, 1024, kernel_size=(1, 1), stride=(1, 1))
+    (bn_7_1): BatchNorm2d(1024, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (act_7_1): ReLU(inplace=True)
+    (conv_8_1): Conv2d(1024, 256, kernel_size=(1, 1), stride=(1, 1))
+    (bn_8_1): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (act_8_1): ReLU(inplace=True)
+    (conv_8_2): Conv2d(256, 512, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1))
+    (bn_8_2): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (act_8_2): ReLU(inplace=True)
+    (conv_9_1): Conv2d(512, 128, kernel_size=(1, 1), stride=(1, 1))
+    (bn_9_1): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (act_9_1): ReLU(inplace=True)
+    (conv_9_2): Conv2d(128, 256, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1))
+    (bn_9_2): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (act_9_2): ReLU(inplace=True)
+    (conv_10_1): Conv2d(256, 128, kernel_size=(1, 1), stride=(1, 1))
+    (bn_10_1): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (act_10_1): ReLU(inplace=True)
+    (conv_10_2): Conv2d(128, 256, kernel_size=(3, 3), stride=(1, 1))
+    (bn_10_2): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (act_10_2): ReLU(inplace=True)
+    (conv_11_1): Conv2d(256, 128, kernel_size=(1, 1), stride=(1, 1))
+    (bn_11_1): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (act_11_1): ReLU(inplace=True)
+    (conv_11_2): Conv2d(128, 256, kernel_size=(3, 3), stride=(1, 1))
+    (bn_11_2): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (act_11_2): ReLU(inplace=True)
+  )
+  (detectors): ModuleDict(
+    (det_10_2): Conv2d(256, 100, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    (det_11_2): Conv2d(256, 100, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    (det_4_3): Conv2d(512, 100, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    (det_7_1): Conv2d(1024, 150, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    (det_8_2): Conv2d(512, 150, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    (det_9_2): Conv2d(256, 150, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+  )
+)
+```
+
+</div></details>
 
 <a id="anchor5"></a>
 
 # デフォルトBBOX作成手順
+デフォルトBBOXの大きさ、アスペクト種数、個数は検出器 (モデルアーキテクチャにおける `detectors` の各 module を指す)ごとに異なっている。</br>
+本実装では、論文の記載をもとに以下のようにデフォルトBBOXを作成した。
 
-準備中
+| 検出器 | BBOXの大きさ | BBOXのアスペクト種数 | BBOXの個数 |
+|-|-|-|-|
+|det_4_3| 0.20 | 4 | 38 * 38 * 4 = 5776 |
+|det_7_1| 0.34 | 6 | 19 * 19 * 6 = 2166 |
+|det_8_2| 0.48 | 6 | 10 * 10 * 6 = 600 |
+|det_9_2| 0.62 | 6 | 5 * 5 * 6 = 150 |
+|det_10_2| 0.76 | 4 | 3 * 3 * 4 = 36 |
+|det_11_2| 0.90 | 4 | 1 * 1 * 4 = 4 |
+
+BBOXの個数の総和は 8732 であり、一画像に対して 8732 個の BBOX を予測している。
 
 <a id="anchor6"></a>
 
@@ -70,12 +177,14 @@ PASCAL VOC (Visual Object Classes) 2007, 2012を使用。
 
 ``` 
 src
+├augmentation   ・・・データ拡張の関数群
+├model          ・・・モデルの定義（VGG16, SSD)
 ├dataset.py     ・・・元データの加工・データセットのクラス
 ├evaluate.py    ・・・評価用のスクリプト
 ├inference.py   ・・・推論用のスクリプト
 ├labelmap.json  ・・・検出対象の一覧
-├model.py       ・・・モデルの定義
-└train.py       ・・・学習用のスクリプト
+├train.py       ・・・学習用のスクリプト
+└utils.py       ・・・共通関数のまとめ
 ```
 
 <a id="anchor8"></a>
@@ -102,24 +211,65 @@ docker run --shm-size=20g --gpus all -it --rm -v /work/object-detection-torch/:/
 学習は `train.py` で行う。以下実行時のパラメータを記載。
 
 ``` 
-usage: train.py [-h] [--imsize IMSIZE] [--grid_num GRID_NUM]
-                [--bbox_num BBOX_NUM] [--class_num CLASS_NUM]
-                [--l_coord L_COORD] [--l_noobj L_NOOBJ]
-                [--batch_size BATCH_SIZE] [--epochs EPOCHS]
-                [--save_period SAVE_PERIOD] [--save_path SAVE_PATH]
+usage: train.py [-h] [--purpose PURPOSE] [--imsize IMSIZE]
+                [--batch_size BATCH_SIZE] [--epochs EPOCHS] [--lr LR]
+                [--weight_decay WEIGHT_DECAY] [--gamma GAMMA]
+                [--num_workers NUM_WORKERS] [--result_dir RESULT_DIR]
+                [--weights WEIGHTS] [--params PARAMS]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --purpose PURPOSE
+  --imsize IMSIZE
+  --batch_size BATCH_SIZE
+  --epochs EPOCHS
+  --lr LR
+  --weight_decay WEIGHT_DECAY
+  --gamma GAMMA
+  --num_workers NUM_WORKERS
+  --result_dir RESULT_DIR
+  --weights WEIGHTS
+  --params PARAMS
+```
+
+`batch_size` , `epochs` 以外はデフォルト値を想定。
+
+## 4. 推論実行
+
+推論は `inference.py` で行う。以下実行時のパラメータを記載。
+
+```
+usage: inference.py [-h] [--imsize IMSIZE] [--batch_size BATCH_SIZE]
+                    [--num_workers NUM_WORKERS] [--result_dir RESULT_DIR]
+                    [--weights WEIGHTS]
 
 optional arguments:
   -h, --help            show this help message and exit
   --imsize IMSIZE
-  --grid_num GRID_NUM
-  --bbox_num BBOX_NUM
-  --class_num CLASS_NUM
-  --l_coord L_COORD
-  --l_noobj L_NOOBJ
   --batch_size BATCH_SIZE
-  --epochs EPOCHS
-  --save_period SAVE_PERIOD
-  --save_path SAVE_PATH
+  --num_workers NUM_WORKERS
+  --result_dir RESULT_DIR
+  --weights WEIGHTS
 ```
 
-`batch_size` , `epochs` 以外はデフォルト値を想定。
+`batch_size` 以外はデフォルト値を想定。
+
+## 5. 評価実行
+
+評価は `evaluate.py` で行う。以下実行時のパラメータを記載。
+
+```
+usage: evaluate.py [-h] [--imsize IMSIZE] [--batch_size BATCH_SIZE]
+                   [--num_workers NUM_WORKERS] [--result_dir RESULT_DIR]
+                   [--weights WEIGHTS]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --imsize IMSIZE
+  --batch_size BATCH_SIZE
+  --num_workers NUM_WORKERS
+  --result_dir RESULT_DIR
+  --weights WEIGHTS
+```
+
+`batch_size` 以外はデフォルト値を想定。
