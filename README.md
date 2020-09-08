@@ -1,13 +1,3 @@
-<script async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS_CHTML"></script>
-<script type="text/x-mathjax-config">
- MathJax.Hub.Config({
-  tex2jax: {
-    inlineMath: [["\\(","\\)"] ],
-    displayMath: [ ['$$','$$'], ["\\[","\\]"] ]
-  }
- });
-</script>
-
 # object-detection-torch
 
 object detection by SSD with pytorch
@@ -180,26 +170,29 @@ BBOXの個数の総和は 8732 であり、一画像に対して 8732 個の BBO
 
 # 損失関数
 論文では以下の損失関数で損失を計算している。
-* $ L(x, c, l, g) = \frac{1}{N}(L_{conf}(x, c) + αL_{loc}(x, l, g)) $
-  * $ L_{loc}(x, l, g) = \sum^{N}_{i \in Pos} \sum_{m \in \{cx, cy, w, h \}} x^{k}_{ij}smooth_{L1}(l^{m}_{i} - \hat{g}^{m}_{j}) $
-  * $ L_{conf}(x, c) = -\sum^{N}_{i \in Pos} x^{p}_{ij}log(\hat{c}^{p}_{i}) -\sum_{i \in Neg} log(\hat{c}^{0}_{i})  $
+<img src="https://latex.codecogs.com/gif.latex?L(x,&space;c,&space;l,&space;g)&space;=&space;\frac{1}{N}(L_{conf}(x,&space;c)&space;&plus;&space;\alpha&space;L_{loc}(x,&space;l,&space;g))">
+
+各項：
+<img src="https://latex.codecogs.com/gif.latex?L_{loc}(x,&space;l,&space;g)&space;=&space;\sum^{N}_{i&space;\in&space;Pos}&space;\sum_{m&space;\in&space;\{cx,&space;cy,&space;w,&space;h&space;\}}&space;x^{k}_{ij}smooth_{L1}(l^{m}_{i}&space;-&space;\hat{g}^{m}_{j})">
+
+<img src="https://latex.codecogs.com/gif.latex?L_{conf}(x,&space;c)&space;=&space;-\sum^{N}_{i&space;\in&space;Pos}&space;x^{p}_{ij}log(\hat{c}^{p}_{i})&space;-\sum_{i&space;\in&space;Neg}&space;log(\hat{c}^{0}_{i})">
 
 本実装では、上記の損失計算を以下の手順で実施した。
 1. **デフォルトBBOX (shape: (P, 4)) と正解BBOX (shape: (N, G, C)) のマッチング**
-  a. デフォルトBBOX（以下 df）、正解BBOX（以下gt）の jaccard係数 を計算。テンソルを拡張し総当り的な計算を行い、shape: (N, P, G) のテンソルを計算結果として得る。
-  b. 閾値より大きいかどうか（Positive or Negative）を判定。shape: (N, P, G) の1, 0からなるテンソルを得る。
+    * デフォルトBBOX（以下 df）、正解BBOX（以下gt）の jaccard係数 を計算。テンソルを拡張し総当り的な計算を行い、shape: (N, P, G) のテンソルを計算結果として得る。
+    * 閾値より大きいかどうか（Positive or Negative）を判定。shape: (N, P, G) の1, 0からなるテンソルを得る。
 1. **Localization loss の計算**
-  a. smooth L1 値を計算後、1. のテンソルを掛けることで Positive のみを残す。
+    * smooth L1 値を計算後、1. のテンソルを掛けることで Positive のみを残す。
 1. **Confidence loss (Positive項) の計算**
-  a. softmax cross entropy 値を計算後、1. のテンソルを掛けることで Positive のみを残す。
+    * softmax cross entropy 値を計算後、1. のテンソルを掛けることで Positive のみを残す。
 1. **Confidence loss (Negative項) の計算**
-  a. 1. のテンソルから、Negative な BBOX かどうかを判定。shape: (N, P) の1, 0からなるテンソルを得る。
-  b. softmax cross entropy 値を計算後、a. のテンソルを掛けることで Negative のみを残す。
+    * 1. のテンソルから、Negative な BBOX かどうかを判定。shape: (N, P) の1, 0からなるテンソルを得る。
+    * softmax cross entropy 値を計算後、このテンソルを掛けることで Negative のみを残す。
 1. **Hard Negative Mining の実施**
-  a. Hard Negative Mining を実施し、2. 3. 4で残った値のうち、Loss計算に含めるものはどれかを判定。shape: (N, P) の1, 0からなるテンソルを2つ(Pos, Neg)得る。
+    * Hard Negative Mining を実施し、2. 3. 4で残った値のうち、Loss計算に含めるものはどれかを判定。shape: (N, P) の1, 0からなるテンソルを2つ(Pos, Neg)得る。
 1. **Loss 合計値の計算**
-  a. 2. 3. 4. で得られたテンソルに、5. のテンソルをかけ、Loss計算に含めるものだけを残す。
-  b. 残った値をバッチ単位で合算し、平均を取る。
+    * 2. 3. 4. で得られたテンソルに、5. のテンソルをかけ、Loss計算に含めるものだけを残す。
+    * 残った値をバッチ単位で合算し、平均を取る。
 
 詳細の実装は [ここ](src/model/ssd.py) の loss 関数を参照。
 
