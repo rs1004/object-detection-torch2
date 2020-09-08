@@ -179,7 +179,7 @@ BBOXの個数の総和は 8732 であり、一画像に対して 8732 個の BBO
 
 本実装では、上記の損失計算を以下の手順で実施した。
 1. **デフォルトBBOX (shape: (P, 4)) と正解BBOX (shape: (N, G, C)) のマッチング**
-    * デフォルトBBOX（以下 df）、正解BBOX（以下gt）の jaccard係数 を計算。テンソルを拡張し総当り的な計算を行い、shape: (N, P, G) のテンソルを計算結果として得る。
+    * デフォルトBBOX、正解BBOXの jaccard係数 を計算。テンソルを拡張し総当り的な計算を行い、shape: (N, P, G) のテンソルを計算結果として得る。
     * 閾値より大きいかどうか（Positive or Negative）を判定。shape: (N, P, G) の1, 0からなるテンソルを得る。
 1. **Localization loss の計算**
     * smooth L1 値を計算後、1 のテンソルを掛けることで Positive のみを残す。
