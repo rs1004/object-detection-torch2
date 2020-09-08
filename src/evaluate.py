@@ -156,12 +156,12 @@ if __name__ == '__main__':
                     result_each_class[c]['count'] += torch.sum(gt_mask)
 
         # クラスごとの AP を計算
-        result = {}
+        result_dict = {}
         for c in result_each_class:
             result = result_each_class[c]['result']
             count = result_each_class[c]['count']
             ap = calc_average_precision(result=result, count=count)
-            result[c] = ap
+            result_dict[c] = ap
 
         # レポート作成
         d = date.today().isoformat()
@@ -173,10 +173,10 @@ if __name__ == '__main__':
             config_table.append(f'|{k}|{v}|')
 
         score_table = ['|label|average precision|', '|-|-|']
-        for class_id, ap in result.items():
+        for class_id, ap in result_dict.items():
             score_table.append(f'|{labelmap.id2name(class_id)}|{_float2str(ap.item())}|')
 
-        m_ap = torch.stack(list(result.values())).mean()
+        m_ap = torch.stack(list(result_dict.values())).mean()
         score_table.append(f'|**mean**|**{_float2str(m_ap.item())}**|')
 
         report = OUTPUT_FORMAT.format(
@@ -186,8 +186,7 @@ if __name__ == '__main__':
             score_table='\n'.join(score_table)
         )
 
-        Path(args.result_dir).mkdir(parents=True, exist_ok=True)
-        with open(Path(args.result_dir) / f'report_{d}.md', 'w') as f:
+        with open(out_dir / f'report_{d}.md', 'w') as f:
             f.write(report)
 
     print('Finished Evaluate')
