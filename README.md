@@ -49,7 +49,7 @@ PASCAL VOC (Visual Object Classes) 2007, 2012を使用。
 <a id="anchor4"></a>
 
 # モデルアーキテクチャ
-SSD モデルは [論文](https://arxiv.org/pdf/1512.02325.pdf) 準拠で作成した。</br>
+SSD モデルは [論文](https://arxiv.org/pdf/1512.02325.pdf) 準拠で作成した。<br>
 本実装は `features` と `detectors` の2つのモジュールで構成した。
 * `features`
   * 特徴量抽出層の群。ベースは vgg16_bn (act_5_3まで) を使用した。
@@ -151,7 +151,7 @@ SSD(
 <a id="anchor5"></a>
 
 # デフォルトBBOX作成手順
-デフォルトBBOXの大きさ、アスペクト種数、個数は検出器 (モデルアーキテクチャにおける `detectors` の各 module を指す)ごとに異なっている。</br>
+デフォルトBBOXの大きさ、アスペクト種数、個数は検出器 (モデルアーキテクチャにおける `detectors` の各 module を指す)ごとに異なっている。<br>
 本実装では、論文の記載をもとに以下のようにデフォルトBBOXを作成した。
 
 | 検出器 | BBOXの大きさ | BBOXのアスペクト種数 | BBOXの個数 |
@@ -163,16 +163,16 @@ SSD(
 |det_10_2| 0.76 | 4 | 3 * 3 * 4 = 36 |
 |det_11_2| 0.90 | 4 | 1 * 1 * 4 = 4 |
 
-BBOXの個数の総和は 8732 であり、一画像に対して 8732 個の BBOX を予測している。</br>
+BBOXの個数の総和は 8732 であり、一画像に対して 8732 個の BBOX を予測している。<br>
 詳細の実装は [ここ](src/model/ssd.py) の _get_default_bboxes 関数を参照。
 
 <a id="anchor6"></a>
 
 # 損失関数
-論文では以下の損失関数で損失を計算している。
+論文では以下の損失関数で損失を計算している。<br>
 <img src="https://latex.codecogs.com/gif.latex?L(x,&space;c,&space;l,&space;g)&space;=&space;\frac{1}{N}(L_{conf}(x,&space;c)&space;&plus;&space;\alpha&space;L_{loc}(x,&space;l,&space;g))">
 
-各項：
+各項：<br>
 <img src="https://latex.codecogs.com/gif.latex?L_{loc}(x,&space;l,&space;g)&space;=&space;\sum^{N}_{i&space;\in&space;Pos}&space;\sum_{m&space;\in&space;\{cx,&space;cy,&space;w,&space;h&space;\}}&space;x^{k}_{ij}smooth_{L1}(l^{m}_{i}&space;-&space;\hat{g}^{m}_{j})">
 
 <img src="https://latex.codecogs.com/gif.latex?L_{conf}(x,&space;c)&space;=&space;-\sum^{N}_{i&space;\in&space;Pos}&space;x^{p}_{ij}log(\hat{c}^{p}_{i})&space;-\sum_{i&space;\in&space;Neg}&space;log(\hat{c}^{0}_{i})">
@@ -182,16 +182,16 @@ BBOXの個数の総和は 8732 であり、一画像に対して 8732 個の BBO
     * デフォルトBBOX（以下 df）、正解BBOX（以下gt）の jaccard係数 を計算。テンソルを拡張し総当り的な計算を行い、shape: (N, P, G) のテンソルを計算結果として得る。
     * 閾値より大きいかどうか（Positive or Negative）を判定。shape: (N, P, G) の1, 0からなるテンソルを得る。
 1. **Localization loss の計算**
-    * smooth L1 値を計算後、1. のテンソルを掛けることで Positive のみを残す。
+    * smooth L1 値を計算後、1 のテンソルを掛けることで Positive のみを残す。
 1. **Confidence loss (Positive項) の計算**
-    * softmax cross entropy 値を計算後、1. のテンソルを掛けることで Positive のみを残す。
+    * softmax cross entropy 値を計算後、1 のテンソルを掛けることで Positive のみを残す。
 1. **Confidence loss (Negative項) の計算**
-    * 1. のテンソルから、Negative な BBOX かどうかを判定。shape: (N, P) の1, 0からなるテンソルを得る。
+    * 1 のテンソルから、Negative な BBOX かどうかを判定。shape: (N, P) の1, 0からなるテンソルを得る。
     * softmax cross entropy 値を計算後、このテンソルを掛けることで Negative のみを残す。
 1. **Hard Negative Mining の実施**
-    * Hard Negative Mining を実施し、2. 3. 4で残った値のうち、Loss計算に含めるものはどれかを判定。shape: (N, P) の1, 0からなるテンソルを2つ(Pos, Neg)得る。
+    * Hard Negative Mining を実施し、2 3 4で残った値のうち、Loss計算に含めるものはどれかを判定。shape: (N, P) の1, 0からなるテンソルを2つ(Pos, Neg)得る。
 1. **Loss 合計値の計算**
-    * 2. 3. 4. で得られたテンソルに、5. のテンソルをかけ、Loss計算に含めるものだけを残す。
+    * 2 3 4 で得られたテンソルに、5 のテンソルをかけ、Loss計算に含めるものだけを残す。
     * 残った値をバッチ単位で合算し、平均を取る。
 
 詳細の実装は [ここ](src/model/ssd.py) の loss 関数を参照。
