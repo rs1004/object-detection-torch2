@@ -87,26 +87,30 @@ def non_maximum_suppression(outputs: torch.Tensor, iou_thresh: float = 0.5) -> t
     Returns:
         torch.Tensor: (N, P, C)
     """
-    def nms(t: torch.Tensor) -> torch.Tensor:
-        """suppress tensor
+    def nms(output: torch.Tensor) -> torch.Tensor:
+        """non-maximum-suppression for each output
 
         Args:
-            t (torch.Tensor): (N, P, C-4, P)
+            output (torch.Tensor): (P, C)
 
         Returns:
-            torch.Tensor: (N, P, C-4)
+            torch.Tensor: (P, 1)
         """
-        suppressed_t = t[:, :, :, 0]
-        for i in range(1, P):
-            t[:, :, :, i] *= suppressed_t
-            suppressed_t += t[:, :, :, i]
-        return suppressed_t
+        vals, indices = torch.sort(torch.max(output[:, 5:], dim=1).values, descending=True)
+        order = order_ = indices[vals > 0.]
+
+        while len(order_) > 1:
+            if order_[0] > -1:
+                target = output[order_[[0]]]
+                others = output[order_[1:]]
+                ious = calc_iou(target.unsqueeze(0), others.unsqueeze(0)).squeeze()
+                order_[1:][ious > iou_thresh] = -1
+            order_ = order_[1:]
+        return torch.eye(P)[order[order > -1]].sum(dim=0).unsqueeze(1).to(output.device)
 
     N, P, _ = outputs.shape
 
-    select_flags = iou_thresh < calc_iou(outputs, outputs) + torch.eye(P).bool().to(outputs.device)
-    orders = torch.sort(outputs[:, :, 4:], dim=1, descending=True).indices
-    valid_mask = nms(t=torch.stack([select_flags[n][orders[n]] for n in range(N)]))
+    valid_mask = torch.stack([nms(output) for output in outputs])
     outputs[:, :, 4:] = outputs[:, :, 4:] * valid_mask
 
     return outputs
