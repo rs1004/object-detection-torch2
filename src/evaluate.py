@@ -28,28 +28,18 @@ OUTPUT_FORMAT = '''
 '''
 
 
-def create_correct_table(iou: torch.Tensor, iou_thresh: float = 0.5) -> torch.Tensor:
-    """create a table of correctness and score
+def get_order(t: torch.Tensor, class_id: int) -> torch.Tensor:
+    """get score order for class id
 
     Args:
-        iou (torch.Tensor): (N, P, G)
-        iou_thresh (float, optional): Iou threshold to be considered correct. Defaults to 0.5.
+        t (torch.Tensor): (X, C)
+        class_id (int): class id
 
     Returns:
-        torch.Tensor: (X, 2)
+        torch.Tensor: (X',)
     """
-    tensor = torch.max(iou, dim=1)
-    result = []
-    used = set()
-    for i in range(len(tensor)):
-        if tensor.values[i] == 0:
-            break
-        correct = False
-        if tensor.values[i] > iou_thresh and tensor.indices[i] not in used:
-            used.add(tensor.indices[i])
-            correct = True
-        result.append([correct, tensor.values[i]])
-    return torch.Tensor(result)
+    vals, indices = torch.sort(t[:, 5 + class_id], descending=True)
+    return indices[vals > 0.]
 
 
 def calc_average_precision(result: torch.Tensor, count: torch.Tensor) -> torch.Tensor:
@@ -121,7 +111,9 @@ if __name__ == '__main__':
 
     labelmap = LabelMap('PascalVOC')
 
-    result_each_class = {c: {'result': torch.empty((0, 2)), 'count': torch.tensor(0)} for c in range(dataset.num_classes)}
+    i = 0
+    result_correct = {}
+    result_count = {c: 0 for c in range(dataset.num_classes)}
     with torch.no_grad():
         with tqdm(dataloader, total=len(dataloader)) as pbar:
             for images, gts in pbar:
@@ -137,29 +129,32 @@ if __name__ == '__main__':
                 outputs[:, :, :4] = calc_coordicate(pr=outputs, df=defaults)
                 outputs[:, :, 4:] = calc_score(pr=outputs)
                 outputs = non_maximum_suppression(outputs=outputs)
+                ious = calc_iou(outputs, gts)
 
-                for c in result_each_class:
-                    # outputs を score 順にソートする
-                    sorted_outputs = torch.stack([outputs[n, torch.sort(outputs[:, :, c + 5]).indices[n], :] for n in range(args.batch_size)])
-
-                    ious = calc_iou(sorted_outputs, gts)
-
-                    # 対象外のものを 0 にする mask をかける
-                    pr_mask = (torch.sum(sorted_outputs[:, :, 4:], dim=2, keepdims=True) != 0)
-                    gt_mask = (torch.max(gts[:, :, 4:], dim=2).indices == c + 5).unsqueeze(1)
-
-                    ious = ious * pr_mask * gt_mask
-
-                    res = torch.cat([create_correct_table(iou) for iou in ious])
-                    if len(res) > 0:
-                        result_each_class[c]['result'] = torch.cat([result_each_class[c]['result'], res])
-                    result_each_class[c]['count'] += torch.sum(gt_mask)
+                for output, gt, iou in zip(outputs, gts, ious):
+                    result_correct[i] = dict()
+                    for c in range(dataset.num_classes):
+                        pr_order, gt_order = get_order(output, c), get_order(gt, c)
+                        if len(pr_order) == len(gt_order) == 0:
+                            continue
+                        elif len(pr_order) == 0:
+                            result_count[c] += len(gt_order)
+                            continue
+                        elif len(gt_order) == 0:
+                            correct = torch.zeros(len(pr_order), 1).to(device)
+                        else:
+                            iou_one_class = iou[pr_order][:, gt_order]
+                            valid = torch.eye(len(gt_order))[iou_one_class.max(dim=1).indices].to(device) * (iou_one_class > 0.5)
+                            correct = ((valid.cumsum(dim=0) == valid) * valid).sum(dim=1, keepdims=True)
+                        result_correct[i][c] = torch.cat([correct, output[pr_order][:, [5 + c]]], dim=1)
+                        result_count[c] += len(gt_order)
+                    i += 1
 
         # クラスごとの AP を計算
         result_dict = {}
-        for c in result_each_class:
-            result = result_each_class[c]['result']
-            count = result_each_class[c]['count']
+        for c in range(dataset.num_classes):
+            result = torch.cat([r[c] for _, r in result_correct.items() if c in r])
+            count = result_count[c]
             ap = calc_average_precision(result=result, count=count)
             result_dict[c] = ap
 
