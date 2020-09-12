@@ -153,10 +153,10 @@ if __name__ == '__main__':
         # クラスごとの AP を計算
         result_dict = {}
         for c in range(dataset.num_classes):
-            result = torch.cat([r[c] for _, r in result_correct.items() if c in r])
+            result = torch.cat([r[c] for _, r in result_correct.items() if c in r]).to('cpu')
             count = result_count[c]
             ap = calc_average_precision(result=result, count=count)
-            result_dict[c] = ap.to('cpu')
+            result_dict[c] = ap
 
         # レポート作成
         d = date.today().isoformat()
