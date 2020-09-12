@@ -156,7 +156,7 @@ if __name__ == '__main__':
             result = torch.cat([r[c] for _, r in result_correct.items() if c in r])
             count = result_count[c]
             ap = calc_average_precision(result=result, count=count)
-            result_dict[c] = ap
+            result_dict[c] = ap.to('cpu')
 
         # レポート作成
         d = date.today().isoformat()
