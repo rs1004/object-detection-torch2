@@ -22,8 +22,71 @@ object detection by SSD with pytorch
 <a id="anchor2"></a>
 
 # 推論結果・評価結果
+学習は以下の設定で行った。
+|item|value|
+|-|-|
+|batch_size|32|
+|epochs|100|
+|lr|0.001|
+|weight_decay|0.0005|
+|gamma|0.95|
 
-準備中
+論文では最適化手法として SGD を用いていたが、Adam と比較したところ、学習の進度（loss の減少速度）は Adam のほうが早いようだったので、本試行では Adam を使用した。 
+
+学習率をスケジューリングし、学習率 = lr * (gamma ^ epoch) になるように学習を行った。
+
+学習は論文準拠となるように実施する予定だったが、loss 計算で pred bbox と gt bbox をマッチングさせる際、iou_thresh = 0.5 という値だと、学習の最初の段階で gt bbox とマッチングするものが見つからず、voidとして学習が進んでしまう結果となり、特に小さい物体の検出に全体的に失敗した。
+
+そこで iou_thresh = 0.25 として学習を行った。
+
+結果を見ると、以下の推論結果に示したように大〜中程度の大きさの物体は検出ができている。
+
+![image.png](images/dog.png)
+![image.png](images/train.png)
+![image.png](images/cat.png)
+
+ただし、non maximum suppression を適用したにも関わらず pred bbox が複数個生じており、localization loss の誤差は残った。
+
+論文では計5万 epoch 学習を行ったと書いてあるので、そのくらい学習を行えば localization loss も低下し、今以上に良い精度で検出ができる可能性はある。
+
+実際、以下の tensorboard での出力結果（loss のグラフ）を見ても、微小ではあるものの減少は続いている。
+
+![image.png](images/loss_train.png)
+![image.png](images/loss_validation.png)
+
+しかし、予算の都合上、本試行はここで終了とする。
+
+本試行での定量評価の結果は以下の通りである。bottle や potted plant などの小さい物体に関して特に精度が低かったものの、前回作成した yolo モデルよりは高い精度を出すことができた。
+
+|label|average precision|
+|-|-|
+|aeroplane|0.457|
+|bicycle|0.27|
+|bird|0.33|
+|boat|0.181|
+|bottle|0.044|
+|bus|0.453|
+|car|0.279|
+|cat|0.635|
+|chair|0.046|
+|cow|0.231|
+|diningtable|0.251|
+|dog|0.558|
+|horse|0.565|
+|motorbike|0.401|
+|person|0.26|
+|pottedplant|0.074|
+|sheep|0.177|
+|sofa|0.298|
+|train|0.593|
+|tvmonitor|0.177|
+|**mean**|**0.314**|
+
+論文で提示されているスコアとの開きが大きいが、各クラス間でのスコアの大小関係は似た傾向を示しているため、全体的に学習が不十分である可能性が高い。
+
+単に学習回数が足りないだけか、あるいは学習方法が不適切なのか現時点では断定できないが、とりあえずスクラッチで実装し形になったので、今回はこれで完成とする。
+
+今後はより最新のモデルの実装を試しながら、本実装の問題点や課題を見出し、より良いモデルの構築を目指していきたい。
 
 <a id="anchor3"></a>
 
