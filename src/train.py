@@ -19,7 +19,7 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=1)
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--weight_decay', type=float, default=0.0005)
-    parser.add_argument('--gamma', type=float, default=0.98)
+    parser.add_argument('--gamma', type=float, default=0.95)
     parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--result_dir', type=str, default='./result')
     parser.add_argument('--weights', type=str, default='weights.pth')
@@ -138,8 +138,8 @@ if __name__ == '__main__':
                 val_loss += loss.item()
         val_loss /= i
 
-        writer.add_scalar('loss', running_loss, epoch)
-        writer.add_scalar('val_loss', val_loss, epoch)
+        writer.add_scalar('loss/train', running_loss, epoch)
+        writer.add_scalar('loss/validation', val_loss, epoch)
         writer.add_scalar('lr', scheduler.get_last_lr()[0], epoch)
 
         if (min_loss is None) or (running_loss < min_loss):

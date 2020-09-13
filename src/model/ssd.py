@@ -228,13 +228,13 @@ class SSD(nn.Module):
 
         return loss
 
-    def _match(self, gt: torch.Tensor, df: torch.Tensor, threshold: float = 0.5) -> torch.Tensor:
+    def _match(self, gt: torch.Tensor, df: torch.Tensor, threshold: float = 0.25) -> torch.Tensor:
         """adapt matching strategy
 
         Args:
             gt (torch.Tensor): (N, G, 4) -> (N, 1, G, 4)
             df (torch.Tensor): (P, 4) -> (1, P, 1, 4)
-            threshold (float, optional): threshold of iou. Defaults to 0.5.
+            threshold (float, optional): threshold of iou. Defaults to 0.25.
 
         Returns:
             torch.Tensor (N, P, G): matching mask
