@@ -67,13 +67,13 @@ class SSD(nn.Module):
 
         self.features = features
 
-        self.classifier = nn.ModuleDict({
-            'act_4_3': nn.Conv2d(in_channels=512, out_channels=4 * (num_classes + 4), kernel_size=3, padding=1),
-            'act_7_1': nn.Conv2d(in_channels=1024, out_channels=6 * (num_classes + 4), kernel_size=3, padding=1),
-            'act_8_2': nn.Conv2d(in_channels=512, out_channels=6 * (num_classes + 4), kernel_size=3, padding=1),
-            'act_9_2': nn.Conv2d(in_channels=256, out_channels=6 * (num_classes + 4), kernel_size=3, padding=1),
-            'act_10_2': nn.Conv2d(in_channels=256, out_channels=4 * (num_classes + 4), kernel_size=3, padding=1),
-            'act_11_2': nn.Conv2d(in_channels=256, out_channels=4 * (num_classes + 4), kernel_size=3, padding=1),
+        self.detectors = nn.ModuleDict({
+            'det_4_3': nn.Conv2d(in_channels=512, out_channels=4 * (num_classes + 4), kernel_size=3, padding=1),
+            'det_7_1': nn.Conv2d(in_channels=1024, out_channels=6 * (num_classes + 4), kernel_size=3, padding=1),
+            'det_8_2': nn.Conv2d(in_channels=512, out_channels=6 * (num_classes + 4), kernel_size=3, padding=1),
+            'det_9_2': nn.Conv2d(in_channels=256, out_channels=6 * (num_classes + 4), kernel_size=3, padding=1),
+            'det_10_2': nn.Conv2d(in_channels=256, out_channels=4 * (num_classes + 4), kernel_size=3, padding=1),
+            'det_11_2': nn.Conv2d(in_channels=256, out_channels=4 * (num_classes + 4), kernel_size=3, padding=1),
         })
 
         # load weights
@@ -99,8 +99,8 @@ class SSD(nn.Module):
         x = self.normalize(x)
         for name, layer in self.features.items():
             x = layer(x)
-            if name in self.classifier:
-                y_ = self.classifier[name](x).permute(0, 2, 3, 1).reshape(batch_size, -1, self.num_classes + 4)
+            if name in self.detectors:
+                y_ = self.detectors[name.replace('act', 'det')](x).permute(0, 2, 3, 1).reshape(batch_size, -1, self.num_classes + 4)
                 y = torch.cat([y, y_], dim=1)
 
         return y
@@ -150,7 +150,7 @@ class SSD(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-        for m in self.classifier.modules():
+        for m in self.detectors.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(
                     m.weight, mode='fan_out', nonlinearity='relu')
@@ -173,8 +173,8 @@ class SSD(nn.Module):
             for param in layer.parameters():
                 yield param
 
-        # generate classifier params
-        for _, layer in self.classifier.items():
+        # generate detectors params
+        for _, layer in self.detectors.items():
             for param in layer.parameters():
                 yield param
 
